@@ -613,7 +613,7 @@
         <input type="email" id="loginEmail" placeholder="name@got.co.th" autocomplete="email"
           onkeydown="if(event.key==='Enter')sendOtp()">
       </div>
-      <button class="login-btn" onclick="sendOtp()">📧 ส่งรหัส OTP ไปที่อีเมล</button>
+      <button class="login-btn" onclick="sendOtp()">📧 ส่งลิงก์เข้าสู่ระบบไปที่อีเมล</button>
       <div style="margin-top:14px;text-align:center">
         <a href="#" onclick="showAdminLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">เข้าสู่ระบบผู้ดูแล (Admin) →</a>
       </div>
@@ -634,15 +634,14 @@
         <a href="#" onclick="resetLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">← กลับไปล็อกอินด้วยอีเมล</a>
       </div>
     </div>
-    <div id="otpStep" style="display:none">
-      <div class="login-field">
-        <label>รหัส OTP 6 หลัก (ส่งไปที่อีเมลของคุณ)</label>
-        <input type="text" id="loginOtp" inputmode="numeric" maxlength="6" placeholder="______"
-          style="letter-spacing:8px;text-align:center;font-size:20px;font-weight:700"
-          onkeydown="if(event.key==='Enter')verifyOtp()">
+    <div id="linkSentStep" style="display:none">
+      <div style="font-size:14px;color:#333;line-height:1.7;margin:6px 0;text-align:left;background:#f5f9ff;border-radius:10px;padding:14px 16px">
+        📧 ส่ง<b>ลิงก์เข้าสู่ระบบ</b>ไปที่อีเมลของคุณแล้ว<br>
+        1) เปิดอีเมล (ตรวจกล่อง Junk / Spam ด้วย)<br>
+        2) คลิกลิงก์ <b>"Sign in"</b> ในอีเมล<br>
+        3) ระบบจะพากลับมาเข้าสู่ระบบอัตโนมัติ
       </div>
-      <button class="login-btn" onclick="verifyOtp()">🔓 ยืนยันเข้าสู่ระบบ</button>
-      <button class="login-btn" style="background:#eef2fb;color:#0067c0;margin-top:8px" onclick="resetLogin()">↩︎ เปลี่ยนอีเมล / ขอรหัสใหม่</button>
+      <button class="login-btn" style="background:#eef2fb;color:#0067c0;margin-top:10px" onclick="resetLogin()">↩︎ เปลี่ยนอีเมล / ส่งลิงก์ใหม่</button>
     </div>
     <div class="login-error" id="loginError"></div>
   </div>
@@ -903,18 +902,17 @@ function _shakeLogin(){
 }
 function resetLogin(){
   _pendingEmail = null;
-  const es = document.getElementById('emailStep'), os = document.getElementById('otpStep'), as = document.getElementById('adminStep');
+  const es = document.getElementById('emailStep'), ls = document.getElementById('linkSentStep'), as = document.getElementById('adminStep');
   if (es) es.style.display = 'block';
-  if (os) os.style.display = 'none';
+  if (ls) ls.style.display = 'none';
   if (as) as.style.display = 'none';
-  const oe = document.getElementById('loginOtp'); if (oe) oe.value = '';
   const ee = document.getElementById('loginError'); if (ee) ee.textContent = '';
   const em = document.getElementById('loginEmail'); if (em) em.focus();
 }
 
 function showAdminLogin(){
   document.getElementById('emailStep').style.display = 'none';
-  document.getElementById('otpStep').style.display = 'none';
+  document.getElementById('linkSentStep').style.display = 'none';
   document.getElementById('adminStep').style.display = 'block';
   document.getElementById('loginError').textContent = '';
   const u = document.getElementById('adminUser'); if (u) u.focus();
@@ -943,37 +941,42 @@ async function sendOtp(){
     errEl.textContent = '❌ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งาน (เฉพาะหัวหน้าแผนก)'; _shakeLogin(); return;
   }
   if (!_sb){ errEl.textContent = '⚠️ ระบบยืนยันตัวตนยังไม่พร้อม (cloud ปิดอยู่)'; return; }
-  errEl.textContent = '⏳ กำลังส่งรหัส OTP...';
+  errEl.textContent = '⏳ กำลังส่งลิงก์เข้าสู่ระบบ...';
   try {
-    const { error } = await _sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await _sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: redirectTo } });
     if (error) throw error;
     _pendingEmail = email;
     document.getElementById('emailStep').style.display = 'none';
-    document.getElementById('otpStep').style.display = 'block';
-    errEl.textContent = '✅ ส่งรหัสไปที่ ' + email + ' แล้ว (ตรวจกล่องอีเมล / สแปม)';
-    const oe = document.getElementById('loginOtp'); if (oe) oe.focus();
+    document.getElementById('linkSentStep').style.display = 'block';
+    errEl.textContent = '✅ ส่งลิงก์ไปที่ ' + email + ' แล้ว';
   } catch(e){
-    errEl.textContent = '❌ ส่ง OTP ไม่สำเร็จ: ' + (e.message || e);
+    errEl.textContent = '❌ ส่งลิงก์ไม่สำเร็จ: ' + (e.message || e);
   }
 }
 
-async function verifyOtp(){
-  const errEl = document.getElementById('loginError');
-  const token = (document.getElementById('loginOtp').value || '').trim();
-  if (token.length < 6){ errEl.textContent = 'กรอกรหัส OTP 6 หลัก'; return; }
-  if (!_sb || !_pendingEmail){ errEl.textContent = 'กรุณาขอรหัส OTP ใหม่'; return; }
-  errEl.textContent = '⏳ กำลังตรวจสอบรหัส...';
+// Auto-login after clicking the magic link (session is parsed from the URL)
+async function checkSession(){
+  if (!_sb) return false;
   try {
-    const { error } = await _sb.auth.verifyOtp({ email: _pendingEmail, token, type: 'email' });
-    if (error) throw error;
-    const email = _pendingEmail;
-    const dept  = MANAGER_MAP[email] || null;
-    const role  = (ADMIN_EMAILS.indexOf(email) >= 0) ? 'admin' : 'manager';
-    currentUser = { role, email, dept };
-    await afterLogin();
-  } catch(e){
-    errEl.textContent = '❌ รหัส OTP ไม่ถูกต้องหรือหมดอายุ'; _shakeLogin();
-  }
+    const { data } = await _sb.auth.getSession();
+    const session = data && data.session;
+    if (session && session.user && session.user.email){
+      const email = session.user.email.toLowerCase();
+      if (MANAGER_MAP[email] || ADMIN_EMAILS.indexOf(email) >= 0){
+        const dept = MANAGER_MAP[email] || null;
+        const role = (ADMIN_EMAILS.indexOf(email) >= 0) ? 'admin' : 'manager';
+        currentUser = { role, email, dept };
+        await afterLogin();
+        return true;
+      } else {
+        await _sb.auth.signOut();  // signed in but not authorized
+        const errEl = document.getElementById('loginError');
+        if (errEl) errEl.textContent = '❌ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งาน';
+      }
+    }
+  } catch(e){ console.error('checkSession failed', e); }
+  return false;
 }
 
 async function afterLogin(){
@@ -3343,12 +3346,12 @@ function showPage(id) {
 // ============================================================
 // INIT
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   cloudInit();   // set up Supabase client if configured
-  // Login enabled: show the credential screen. Data is loaded in doLogin()
-  // after a successful sign-in (which also pulls the shared cloud copy).
   document.getElementById('loginOverlay').style.display = 'flex';
-  const _le = document.getElementById('loginEmail'); if (_le) _le.focus();
+  // If the user just clicked a magic link, the session is in the URL — auto login.
+  const ok = await checkSession();
+  if (!ok) { const _le = document.getElementById('loginEmail'); if (_le) _le.focus(); }
 });
 </script>
 <style>
