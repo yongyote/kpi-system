@@ -51,6 +51,29 @@
   }
   nav button:hover { color: var(--primary); background: #f0f7ff; border-radius: 8px 8px 0 0; }
   nav button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+  /* Department dropdown nav */
+  .nav-dept { position: relative; display: inline-flex; }
+  .nav-dept-btn {
+    padding: 14px 16px; border: none; background: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: var(--text-muted);
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+    white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
+  }
+  .nav-dept-btn:hover { color: var(--primary); background: #f0f7ff; border-radius: 8px 8px 0 0; }
+  .nav-dept-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .nav-dept-menu {
+    position: fixed; background: #fff; border: 1px solid #dbe3ef; border-radius: 10px;
+    box-shadow: 0 12px 34px rgba(0,0,0,.18); padding: 6px; min-width: 260px;
+    max-height: 72vh; overflow: auto; z-index: 3000;
+  }
+  .nav-dept-menu .ndm-head { font-size: 11px; font-weight: 700; color: #8a94a6; padding: 6px 10px 6px; border-bottom: 1px solid #eef2f8; margin-bottom: 4px; }
+  .nav-dept-menu button {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+    width: 100%; text-align: left; padding: 8px 10px; border: none; background: none;
+    cursor: pointer; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--text); white-space: normal;
+  }
+  .nav-dept-menu button:hover { background: #f0f7ff; }
+  .nav-dept-menu button .ndm-eng { font-size: 11px; color: #8a94a6; font-weight: 400; }
 
   /* MAIN */
   main { padding: 24px; max-width: 1280px; margin: 0 auto; }
@@ -553,6 +576,10 @@
     font-family: inherit;
   }
   .header-logout-btn:hover { background: rgba(255,255,255,0.32); }
+  .round-switch { display: inline-flex; background: rgba(255,255,255,.18); border-radius: 9px; padding: 3px; gap: 2px; margin-right: 8px; }
+  .round-switch button { border: none; background: none; color: #fff; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 7px; cursor: pointer; opacity: .85; white-space: nowrap; }
+  .round-switch button:hover { opacity: 1; }
+  .round-switch button.active { background: #fff; color: #0067c0; opacity: 1; }
   /* MEMBER-MODE: hide admin-only elements */
   body.member-mode .admin-only { display: none !important; }
   body.member-mode .weight-cell { pointer-events: none; }
@@ -601,6 +628,10 @@
     <p>Microsoft Team · ประเมินผลการทำงานประจำปี 2026</p>
   </div>
   <div id="headerUser" style="display:none">
+    <div class="round-switch" id="roundSwitch" style="display:none">
+      <button id="roundBtn1" onclick="setRound(1)">ครั้งที่ 1 · Q1</button>
+      <button id="roundBtn2" onclick="setRound(2)">ครั้งที่ 2 · Q4</button>
+    </div>
     <span id="headerUserName" style="font-size:13px; opacity:0.9; font-weight:600;"></span>
     <span id="cloudStatus" style="font-size:12px; opacity:0.85; font-weight:600; display:none;"></span>
     <button class="header-logout-btn" onclick="doLogout()">ออกจากระบบ</button>
@@ -610,12 +641,7 @@
 <nav id="mainNav">
   <button class="active" onclick="showPage('dashboard')">🏠 Dashboard</button>
   <button onclick="showPage('compare')">📈 เปรียบเทียบทีม</button>
-  <button onclick="showPage('person_Pongwit')">Pongwit</button>
-  <button onclick="showPage('person_Ratthawit')">Ratthawit</button>
-  <button onclick="showPage('person_Panupat')">Panupat</button>
-  <button onclick="showPage('person_Natthapas')">Natthapas</button>
-  <button onclick="showPage('person_Nathapong')">Nathapong</button>
-  <button onclick="showPage('person_Namo')">Namo</button>
+  <span id="navPersons" style="display:contents"></span>
 </nav>
 
 <main>
@@ -626,9 +652,14 @@
         <h2 style="font-size:20px; font-weight:800;">Team Overview</h2>
         <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">คลิกที่การ์ดเพื่อดูรายละเอียด KPI แต่ละคน</p>
       </div>
-      <button class="btn btn-success" onclick="saveAll()">💾 บันทึกข้อมูลทั้งหมด</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--text-muted);font-weight:600">แผนก:</label>
+        <select id="deptFilter" onchange="setDeptFilter(this.value)"
+          style="padding:7px 12px;border:1px solid #cdd6e4;border-radius:8px;font-size:13px;font-weight:600;background:#fff;cursor:pointer;min-width:230px"></select>
+        <button class="btn btn-success btn-save-round" onclick="saveAll()">💾 บันทึก</button>
+      </div>
     </div>
-    <div class="grid-6" id="dashboardCards"></div>
+    <div id="dashboardCards"></div>
 
     <div style="margin-top:24px;" class="card">
       <div class="card-title">🔽 KPI Performance Funnel</div>
@@ -636,7 +667,7 @@
     </div>
 
     <div style="margin-top:24px;" class="card">
-      <div class="card-title">📊 ภาพรวมคะแนนทีม</div>
+      <div class="card-title">📊 ภาพรวมคะแนนเฉลี่ยรายแผนก</div>
       <div class="chart-container">
         <canvas id="teamRadarChart"></canvas>
       </div>
@@ -705,8 +736,11 @@ const CLOUD = {
 
 // localStorage keys that make up the full shared state
 const CLOUD_KEYS = [
-  'kpi2026_scores', 'kpi2026_disabled', 'kpi2026_weights',
-  'kpi2026_customKPIs', 'kpi2026_evidence', 'kpi2026_history', 'kpi2026_saved',
+  'kpi2026_scores_r1', 'kpi2026_scores_r2',
+  'kpi2026_evidence_r1', 'kpi2026_evidence_r2',
+  'kpi2026_history_r1', 'kpi2026_history_r2',
+  'kpi2026_saved_r1', 'kpi2026_saved_r2',
+  'kpi2026_disabled', 'kpi2026_weights', 'kpi2026_customKPIs',
 ];
 
 let _sb = null;
@@ -736,6 +770,12 @@ async function cloudPull() {
       const blob = data.data;
       CLOUD_KEYS.forEach(k => {
         if (blob[k] !== undefined && blob[k] !== null) {
+          localStorage.setItem(k, typeof blob[k] === 'string' ? blob[k] : JSON.stringify(blob[k]));
+        }
+      });
+      // legacy (pre-round) keys -> restore so migrateRoundStorage can map to Round 1
+      ['kpi2026_scores','kpi2026_evidence','kpi2026_history','kpi2026_saved'].forEach(k => {
+        if (blob[k] !== undefined && blob[k] !== null && localStorage.getItem(k) === null) {
           localStorage.setItem(k, typeof blob[k] === 'string' ? blob[k] : JSON.stringify(blob[k]));
         }
       });
@@ -795,6 +835,7 @@ function setCloudStatus(state) {
 }
 
 function loadAllLocal() {
+  migrateRoundStorage(); loadRound();
   loadScores(); loadEvidence(); loadDisabled();
   loadCustomWeights(); loadCustomKPIs(); loadSaveHistory();
 }
@@ -803,13 +844,13 @@ function loadAllLocal() {
 // AUTH — Login / Logout / Role
 // ============================================================
 const USERS = {
-  'admin':     { password: 'admin2026',     role: 'admin',  name: 'Admin' },
-  'pongwit':   { password: 'Pongwit2026',   role: 'member', name: 'Pongwit' },
-  'ratthawit': { password: 'Ratthawit2026', role: 'member', name: 'Ratthawit' },
-  'panupat':   { password: 'Panupat2026',   role: 'member', name: 'Panupat' },
-  'natthapas': { password: 'Natthapas2026', role: 'member', name: 'Natthapas' },
-  'nathapong': { password: 'Nathapong2026', role: 'member', name: 'Nathapong' },
-  'namo':      { password: 'Namo2026',      role: 'member', name: 'Namo' },
+  'admin':     { password: 'admin2026',     role: 'admin',  name: 'Admin',     key: null },
+  'pongwit':   { password: 'Pongwit2026',   role: 'member', name: 'Pongwit',   key: '63259' },
+  'ratthawit': { password: 'Ratthawit2026', role: 'member', name: 'Ratthawit', key: '62246' },
+  'panupat':   { password: 'Panupat2026',   role: 'member', name: 'Panupat',   key: '65298' },
+  'natthapas': { password: 'Natthapas2026', role: 'member', name: 'Natthapas', key: '66312' },
+  'nathapong': { password: 'Nathapong2026', role: 'member', name: 'Nathapong', key: '69377' },
+  'namo':      { password: 'Namo2026',      role: 'member', name: 'Namo',      key: '69381' },
 };
 
 let currentUser = null;
@@ -843,8 +884,12 @@ async function doLogin() {
 
   await cloudPull();            // fetch shared data first (no-op if cloud off)
   loadAllLocal();
+  loadDeptFilter();
   buildPersonPages();
+  buildNav();
+  buildDeptFilter();
   applyRoleUI();
+  updateRoundUI();
 }
 
 function doLogout() {
@@ -864,18 +909,16 @@ function applyRoleUI() {
   if (currentUser.role === 'admin') {
     document.body.classList.remove('member-mode');
     document.querySelectorAll('nav button').forEach(b => b.style.display = '');
+    const np = document.getElementById('navPersons'); if (np) np.style.display = 'contents';
     renderDashboard();
     showPage('dashboard');
   } else {
-    const memberName = currentUser.name;
+    const memberName = currentUser.key;
     document.querySelectorAll('nav button').forEach(btn => {
       const oc = btn.getAttribute('onclick') || '';
-      if (oc.includes("'dashboard'") || oc.includes("'compare'")) {
-        btn.style.display = 'none';
-      } else if (oc.includes('person_') && !oc.includes(`'person_${memberName}'`)) {
-        btn.style.display = 'none';
-      }
+      if (oc.includes("'dashboard'") || oc.includes("'compare'")) btn.style.display = 'none';
     });
+    const np = document.getElementById('navPersons'); if (np) np.style.display = 'none';
     document.body.classList.add('member-mode');
     showPage('person_' + memberName);
   }
@@ -1227,50 +1270,140 @@ const KPI_RUBRIC = {
   },
 };
 
-const MEMBERS = ['Pongwit','Ratthawit','Panupat','Natthapas','Nathapong','Namo'];
-const AVATAR_COLORS = ['#0078d4','#107c10','#8764b8','#ca5010','#e3008c','#005a9e'];
+const DEPARTMENTS = {
+  '3301': { name: "Project Delivery & Customer Engagement", color: '#0078d4' },
+  '3302': { name: "Network Infrastructure", color: '#107c10' },
+  '3303': { name: "Microsoft Identity & Cybersecurity (MICS)", color: '#8764b8' },
+  '3304': { name: "DevOps & DevSecOps", color: '#ca5010' },
+  '3305': { name: "Solution Consulting & Strategy (SCS)", color: '#e3008c' },
+  '3306': { name: "Hybrid Multi-Cloud (HMC)", color: '#008272' },
+};
+const MEMBER_LIST = [
+  { key:'54093', empId:'54093', thai:"นายปณตช์วงศ์ ล้ออุทัย", eng:"Panotwong Loauthai", engFirst:"Panotwong", nick:"นต", pos:"IT Transformation Support Assistant Division Manager (Project delivery & Customer Engagement Department) IT Transformation Support Assistant Division Manager ((Project delivery & Customer Engagement Department)", dept:'3301' },
+  { key:'59186', empId:'59186', thai:"นายอาณาจักร อังศุมาลี", eng:"Arnachak Aungsumalee", engFirst:"Arnachak", nick:"ดิว", pos:"IT Transformation Support Assistant Division Manager (Network Infrastructure Department)", dept:'3302' },
+  { key:'62249', empId:'62249', thai:"นายศิครินทร์ รุ่งเจริญ", eng:"Sikarin Rungchareon", engFirst:"Sikarin", nick:"เต๊าะ", pos:"Network Engineer", dept:'3302' },
+  { key:'64277', empId:'64277', thai:"นายธนพงษ์ กิ่งพวง", eng:"Thanapong Kingpuang", engFirst:"Thanapong", nick:"เจ", pos:"Network Engineer", dept:'3302' },
+  { key:'65303', empId:'65303', thai:"นายอุดมเดช กรอบมุข", eng:"Udomdech Krobmuk", engFirst:"Udomdech", nick:"เดช", pos:"Network Engineer", dept:'3302' },
+  { key:'62243', empId:'62243', thai:"นายยงยศ บุญประโคน", eng:"Yongyote Boonprakon", engFirst:"Yongyote", nick:"โอม", pos:"Deputy IT Transformation Support Division Manager", dept:'3303' },
+  { key:'62246', empId:'62246', thai:"นายรัฐวิทย์ บริรักษ์วาณิชย์", eng:"Ratthawit Borirakwanit", engFirst:"Ratthawit", nick:"ทรังค์", pos:"Senior System Engineer", dept:'3303' },
+  { key:'63259', empId:'63259', thai:"นายพงษ์วิศว์ สุดชูเกียรติ", eng:"Pongwit Sudshukiat", engFirst:"Pongwit", nick:"เป๊ก", pos:"Senior System Engineer", dept:'3303' },
+  { key:'66312', empId:'66312', thai:"นายณัฐภาส ชัยศิริ", eng:"Natthapas Chaisiri", engFirst:"Natthapas", nick:"สิริ", pos:"System Engineer", dept:'3303' },
+  { key:'69377', empId:'69377', thai:"นายณัฐพงศ์ วัฒนสิทธิ์", eng:"Nattapong Wattanasit", engFirst:"Nattapong", nick:"ณัฐ", pos:"System Engineer", dept:'3303' },
+  { key:'69381', empId:'69381', thai:"นายนะโม แสงเดือน", eng:"Namo Sangdeam", engFirst:"Namo", nick:"นะโม", pos:"System Engineer", dept:'3303' },
+  { key:'59185', empId:'59185', thai:"นายสัตยา บานบัว", eng:"Sattaya Banbua", engFirst:"Sattaya", nick:"เต้ย", pos:"Deputy IT Transformation Support Division Manager", dept:'3304' },
+  { key:'54090', empId:'54090', thai:"นายวรภณ ปรีชาสุนทรรัตน์", eng:"Worapon Preeshasoonthornratn", engFirst:"Worapon", nick:"หน่ำซัว", pos:"Senior Devops Engineer", dept:'3304' },
+  { key:'62257', empId:'62257', thai:"นายจิรภัทร ธรรมศิริ", eng:"Jirapat Dhammasiri", engFirst:"Jirapat", nick:"น๊อต", pos:"Senior Devops Engineer", dept:'3304' },
+  { key:'64278', empId:'64278', thai:"นายกษิดิศ รอดมุ้ย", eng:"Kasidis Rodmui", engFirst:"Kasidis", nick:"กระบุง", pos:"Senior Devops Engineer", dept:'3304' },
+  { key:'66319', empId:'66319', thai:"นางสาวสมฤทัย อ่อนอำไพ", eng:"Somruethai Onamphai", engFirst:"Somruethai", nick:"แฟนต้า", pos:"DevOps Engineer", dept:'3304' },
+  { key:'67328', empId:'67328', thai:"นายธนกร ประสมกิจ", eng:"Thanakorn Prasomkit", engFirst:"Thanakorn", nick:"กร", pos:"DevOps Engineer", dept:'3304' },
+  { key:'68355', empId:'68355', thai:"นายภูบดี จันทร์มณี", eng:"Phubhodee Junmanee", engFirst:"Phubhodee", nick:"ภู", pos:"DevOps Engineer", dept:'3304' },
+  { key:'68356', empId:'68356', thai:"นายเจตพัฒน์ ตันเทียว", eng:"Jedtapat Tanthiew", engFirst:"Jedtapat", nick:"เจมส์", pos:"DevOps Engineer", dept:'3304' },
+  { key:'63258', empId:'63258', thai:"นางประภัทรศรี ปิยะชัยวุฒิ", eng:"Prapatsee Piyachaiwut", engFirst:"Prapatsee", nick:"แนน", pos:"DevSecOps Product Manager", dept:'3304' },
+  { key:'69373', empId:'69373', thai:"นายนภัส ไถ้บ้านกวย", eng:"Napat Thaibankuai", engFirst:"Napat", nick:"เซฟ", pos:"DevOps Engineer", dept:'3304' },
+  { key:'69384', empId:'69384', thai:"นายอริญชย์ ชาติละออง", eng:"Arin Chatlaong", engFirst:"Arin", nick:"โอ๊ค", pos:"DevOps Engineer", dept:'3304' },
+  { key:'63270', empId:'63270', thai:"นางสาวประภัสสร วิมลเกียรติ", eng:"Prapatsorn Wimonkeat", engFirst:"Prapatsorn", nick:"น้อง", pos:"Senior Technical Consultant", dept:'3305' },
+  { key:'63271', empId:'63271', thai:"นายศรายุทธ  อินทรศิริ", eng:"Salayut Intharasiri", engFirst:"Salayut", nick:"โป้ย", pos:"Senior Technical Consultant", dept:'3305' },
+  { key:'69376', empId:'69376', thai:"นางสาวศิรินาจ วิจิตรบรรจง", eng:"Sirinaj Wijitbanjong", engFirst:"Sirinaj", nick:"มด", pos:"Technical Consultant", dept:'3305' },
+  { key:'53081', empId:'53081', thai:"นายเชษฐา เลิศกมลรักษ์", eng:"Chettha Loetkamonrak", engFirst:"Chettha", nick:"เฟริส", pos:"Deputy IT Transformation Support Division Manager", dept:'3306' },
+  { key:'60214', empId:'60214', thai:"นายณัฐชนน กมลโต", eng:"Nutchanon Kamolto", engFirst:"Nutchanon", nick:"ไนซ์", pos:"Cloud Engineer", dept:'3306' },
+  { key:'64272', empId:'64272', thai:"นายภัทรพงศ์ คำฉิม", eng:"Pattarapong Khamchim", engFirst:"Pattarapong", nick:"บอย", pos:"Cloud Engineer", dept:'3306' },
+  { key:'64284', empId:'64284', thai:"นายเนตรพิพัฒน์ จันทตน", eng:"Netphiphat Chanthaton", engFirst:"Netphiphat", nick:"เนตร", pos:"Cloud Engineer", dept:'3306' },
+  { key:'63260', empId:'63260', thai:"นายคณาวุธ อุปมาณ", eng:"Kanavut Uphamarn", engFirst:"Kanavut", nick:"นิวท์", pos:"System Engineer", dept:'3306' },
+  { key:'63261', empId:'63261', thai:"นายธีรวัจน์ จันทรวิศรุต", eng:"Theerawat Chantarawisarut", engFirst:"Theerawat", nick:"ต้า", pos:"System Engineer", dept:'3306' },
+  { key:'64287', empId:'64287', thai:"นายลัทธสิทธิ์ เดชศิริ", eng:"Latthasit Detsiri", engFirst:"Latthasit", nick:"โฟร์", pos:"System Engineer", dept:'3306' },
+  { key:'65291', empId:'65291', thai:"นายชลทิศ อนุสรณ์นรการ", eng:"Chonlatis Anusornorakarn", engFirst:"Chonlatis", nick:"แบงค์", pos:"System Engineer", dept:'3306' },
+  { key:'65298', empId:'65298', thai:"นายภาณุพรรธน์ จิรพัฒนาวุฒิชัย", eng:"Panupat Jirapattanawuttichai", engFirst:"Panupat", nick:"เบียร์", pos:"System Engineer", dept:'3306' },
+  { key:'68354', empId:'68354', thai:"นายกันตินันท์ บุญยิ่งสถิตย์", eng:"Kantinan Boonyingsathit", engFirst:"Kantinan", nick:"ไช้", pos:"System Engineer", dept:'3306' },
+  { key:'69380', empId:'69380', thai:"นายเอกสิทธิ์ โพธิ์จันทร์", eng:"Aekkasit Phochan", engFirst:"Aekkasit", nick:"เอก", pos:"Cloud Engineer", dept:'3306' },
+];
+const MEMBERS = MEMBER_LIST.map(m => m.key);
+const MEMBER_INFO = Object.fromEntries(MEMBER_LIST.map(m => [m.key, m]));
+const AVATAR_COLORS = ['#0078d4','#107c10','#8764b8','#ca5010','#e3008c','#008272','#005a9e','#8e562e'];
+function getInfo(k){ return MEMBER_INFO[k] || {}; }
+function displayName(k){ const m=MEMBER_INFO[k]; return m ? (m.nick || m.engFirst || k) : k; }
+function fullName(k){ const m=MEMBER_INFO[k]; return m ? m.thai : k; }
+function colorFor(k){ const m=MEMBER_INFO[k]; return (m && DEPARTMENTS[m.dept]) ? DEPARTMENTS[m.dept].color : '#0078d4'; }
+function deptName(k){ const m=MEMBER_INFO[k]; return (m && DEPARTMENTS[m.dept]) ? DEPARTMENTS[m.dept].name : ''; }
+const MIGRATE_MAP = { Pongwit:'63259', Ratthawit:'62246', Panupat:'65298', Natthapas:'66312', Nathapong:'69377', Namo:'69381' };
+function migrateKeys(obj){ if(!obj||typeof obj!=='object') return obj; Object.keys(MIGRATE_MAP).forEach(o=>{ if(obj[o]!==undefined && obj[MIGRATE_MAP[o]]===undefined){ obj[MIGRATE_MAP[o]]=obj[o]; delete obj[o]; } }); return obj; }
 
 // Default scores from Excel
 const DEFAULT_SCORES = {
-  Pongwit:   { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
-  Ratthawit: { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':5,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
-  Panupat:   { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
-  Natthapas: { '1.1':null,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
-  Nathapong: { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
-  Namo:      { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '63259': { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '62246': { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':5,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '65298': { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '66312': { '1.1':null,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '69377': { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  '69381': { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
 };
 
 // Load from localStorage or use defaults
 let scores = {};
+// ============================================================
+// EVALUATION ROUNDS — 2 per year (Round 1 = Q1, Round 2 = Q4)
+// ============================================================
+let currentRound = 1;
+const ROUND_LABEL = { 1: 'ครั้งที่ 1 (Q1)', 2: 'ครั้งที่ 2 (Q4)' };
+function rkey(base){ return 'kpi2026_' + base + '_r' + currentRound; }
+function loadRound(){ try { const r = parseInt(localStorage.getItem('kpi2026_round')); currentRound = (r === 2) ? 2 : 1; } catch(e){ currentRound = 1; } }
+function migrateRoundStorage(){
+  [['kpi2026_scores','kpi2026_scores_r1'],['kpi2026_evidence','kpi2026_evidence_r1'],
+   ['kpi2026_history','kpi2026_history_r1'],['kpi2026_saved','kpi2026_saved_r1']].forEach(function(p){
+    try { if (localStorage.getItem(p[1]) === null && localStorage.getItem(p[0]) !== null) localStorage.setItem(p[1], localStorage.getItem(p[0])); } catch(e){}
+  });
+}
+function updateRoundUI(){
+  const sw = document.getElementById('roundSwitch'); if (sw) sw.style.display = 'inline-flex';
+  const b1 = document.getElementById('roundBtn1'), b2 = document.getElementById('roundBtn2');
+  if (b1) b1.classList.toggle('active', currentRound === 1);
+  if (b2) b2.classList.toggle('active', currentRound === 2);
+  document.querySelectorAll('.btn-save-round').forEach(function(el){ el.textContent = '💾 บันทึก ' + ROUND_LABEL[currentRound]; });
+}
+function setRound(r){
+  r = (r === 2) ? 2 : 1;
+  if (r === currentRound) return;
+  currentRound = r;
+  try { localStorage.setItem('kpi2026_round', String(r)); } catch(e){}
+  loadScores(); loadEvidence(); loadSaveHistory();
+  buildPersonPages();
+  const active = document.querySelector('.page.active');
+  const id = active ? active.id.replace('page-','') : 'dashboard';
+  showPage(id);
+  updateRoundUI();
+  showToast('สลับไป ' + ROUND_LABEL[currentRound]);
+}
+
 function loadScores() {
   try {
-    const saved = localStorage.getItem('kpi2026_scores');
+    const saved = localStorage.getItem(rkey('scores'));
     if (saved) {
-      scores = JSON.parse(saved);
+      scores = JSON.parse(saved); migrateKeys(scores);
     } else {
       scores = JSON.parse(JSON.stringify(DEFAULT_SCORES));
     }
   } catch(e) {
     scores = JSON.parse(JSON.stringify(DEFAULT_SCORES));
   }
+  // Ensure every member has a score bucket (new staff have no defaults)
+  MEMBERS.forEach(k => { if (!scores[k]) scores[k] = {}; });
 }
 
 function saveAll() {
-  localStorage.setItem('kpi2026_scores', JSON.stringify(scores));
+  localStorage.setItem(rkey('scores'), JSON.stringify(scores));
   localStorage.setItem('kpi2026_disabled', JSON.stringify(disabled));
   localStorage.setItem('kpi2026_weights', JSON.stringify(customWeights));
   localStorage.setItem('kpi2026_customKPIs', JSON.stringify(customKPIs));
   try {
-    localStorage.setItem('kpi2026_evidence', JSON.stringify(evidence));
+    localStorage.setItem(rkey('evidence'), JSON.stringify(evidence));
   } catch(e) {
     showToast('⚠️ รูปภาพมีขนาดใหญ่เกิน — บันทึกได้เฉพาะคะแนน');
   }
   // Record history snapshot for each member
   MEMBERS.forEach(name => recordHistory(name));
   const ts = new Date().toLocaleString('th-TH');
-  localStorage.setItem('kpi2026_saved', ts);
+  localStorage.setItem(rkey('saved'), ts);
   document.querySelectorAll('.last-saved').forEach(el => el.textContent = 'บันทึกเมื่อ: ' + ts);
-  showToast('บันทึกข้อมูลเรียบร้อยแล้ว ✓');
+  showToast('บันทึก ' + ROUND_LABEL[currentRound] + ' เรียบร้อยแล้ว ✓');
   // Push shared copy to the cloud (no-op if cloud not configured)
   cloudPush();
 }
@@ -1282,8 +1415,8 @@ let evidence = {};
 
 function loadEvidence() {
   try {
-    const saved = localStorage.getItem('kpi2026_evidence');
-    if (saved) evidence = JSON.parse(saved);
+    const saved = localStorage.getItem(rkey('evidence'));
+    if (saved) { evidence = JSON.parse(saved); migrateKeys(evidence); }
   } catch(e) { evidence = {}; }
 }
 
@@ -1504,52 +1637,140 @@ function barColor(pct) {
 // ============================================================
 let radarChart = null;
 
+let deptFilter = 'all';
+function loadDeptFilter(){ try { deptFilter = localStorage.getItem('kpi2026_deptFilter') || 'all'; } catch(e){ deptFilter='all'; } }
+function setDeptFilter(v){ deptFilter = v; try{ localStorage.setItem('kpi2026_deptFilter', v); }catch(e){} renderDashboard(); }
+function filteredMembers(){ return deptFilter==='all' ? MEMBERS.slice() : MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept===deptFilter); }
+function buildDeptFilter(){
+  const el = document.getElementById('deptFilter'); if(!el) return;
+  let html = '<option value="all">ทุกแผนก (ทั้งฝ่าย ITS)</option>';
+  Object.keys(DEPARTMENTS).forEach(code => {
+    const n = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept===code).length;
+    if(!n) return;
+    html += `<option value="${code}">${code} · ${DEPARTMENTS[code].name} (${n})</option>`;
+  });
+  el.innerHTML = html; el.value = deptFilter;
+}
 function renderDashboard() {
   const container = document.getElementById('dashboardCards');
   container.innerHTML = '';
 
-  MEMBERS.forEach((name, idx) => {
-    const total = calcTotal(name);
-    const grade = getGrade(total);
-    const gClass = gradeClass(grade);
-    const initials = name.slice(0,2).toUpperCase();
+  Object.keys(DEPARTMENTS).forEach(code => {
+    if (deptFilter !== 'all' && code !== deptFilter) return;
+    const mem = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code);
+    if (!mem.length) return;
+    const dcolor = DEPARTMENTS[code].color;
 
-    const card = document.createElement('div');
-    card.className = 'member-card';
-    card.onclick = () => showPage('person_' + name);
+    const sec = document.createElement('div');
+    sec.style.marginBottom = '26px';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-left:2px;flex-wrap:wrap';
+    head.innerHTML = `<span style="width:6px;height:22px;border-radius:3px;background:${dcolor};display:inline-block"></span>
+      <h3 style="font-size:16px;font-weight:800;color:${dcolor}">${DEPARTMENTS[code].name}</h3>
+      <span style="font-size:12px;color:var(--text-muted)">(${code} · ${mem.length} คน)</span>`;
+    sec.appendChild(head);
 
-    const sectionBars = KPI_SECTIONS.map((sec, si) => {
-      const pct = calcSection(name, si);
-      return `<div class="section-bar">
-        <span class="label">${si+1}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor(pct)}"></div></div>
-        <span class="pct">${pct.toFixed(0)}%</span>
-      </div>`;
-    }).join('');
+    const grid = document.createElement('div');
+    grid.className = 'grid-6';
 
-    card.innerHTML = `
-      <div class="avatar" style="background:${AVATAR_COLORS[idx]}">${initials}</div>
-      <h3>${name}</h3>
-      <div class="total-score" style="color:${AVATAR_COLORS[idx]}">${total.toFixed(1)}%</div>
-      <span class="grade-badge ${gClass}">${grade} · ${gradeLabel(grade)}</span>
-      <div class="section-bars">${sectionBars}</div>
-    `;
-    container.appendChild(card);
+    mem.forEach(name => {
+      const info = MEMBER_INFO[name];
+      const total = calcTotal(name);
+      const grade = getGrade(total);
+      const gClass = gradeClass(grade);
+      const initials = (info.nick || info.engFirst || '?').slice(0,2);
+
+      const card = document.createElement('div');
+      card.className = 'member-card';
+      card.onclick = () => showPage('person_' + name);
+
+      const sectionBars = KPI_SECTIONS.map((secx, si) => {
+        const pct = calcSection(name, si);
+        return `<div class="section-bar">
+          <span class="label">${si+1}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor(pct)}"></div></div>
+          <span class="pct">${pct.toFixed(0)}%</span>
+        </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="avatar" style="background:${dcolor}">${initials}</div>
+        <h3>${info.nick || info.engFirst}</h3>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:1px">${info.eng}</div>
+        <div style="font-size:10px;color:#9aa;margin-bottom:6px;min-height:12px">${info.pos ? (info.pos.length>40?info.pos.slice(0,39)+'…':info.pos) : ''}</div>
+        <div class="total-score" style="color:${dcolor}">${total.toFixed(1)}%</div>
+        <span class="grade-badge ${gClass}">${grade} · ${gradeLabel(grade)}</span>
+        <div class="section-bars">${sectionBars}</div>
+      `;
+      grid.appendChild(card);
+    });
+
+    sec.appendChild(grid);
+    container.appendChild(sec);
   });
 
   renderFunnel();
   renderTeamRadar();
 }
 
+const DEPT_SHORT = { '3301':'Project Delivery', '3302':'Network Infra', '3303':'MICS', '3304':'DevOps', '3305':'SCS', '3306':'HMC' };
+function buildNav() {
+  const el = document.getElementById('navPersons');
+  if (!el) return;
+  let html = '';
+  Object.keys(DEPARTMENTS).forEach(code => {
+    const mem = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code);
+    if (!mem.length) return;
+    const short = DEPT_SHORT[code] || code;
+    let items = `<div class="ndm-head">${code} · ${DEPARTMENTS[code].name}</div>`;
+    mem.forEach(k => {
+      const i = MEMBER_INFO[k];
+      items += `<button onclick="openPerson('${k}')"><span>${i.eng || i.engFirst}${i.nick ? ' (' + i.nick + ')' : ''}</span><span class="ndm-eng">${i.pos || ''}</span></button>`;
+    });
+    html += `<div class="nav-dept" data-code="${code}">
+      <button class="nav-dept-btn" id="deptbtn_${code}" onclick="toggleDeptMenu('${code}',event)">${short} <span style="opacity:.55;font-weight:700">${mem.length}</span> ▾</button>
+      <div class="nav-dept-menu" id="deptmenu_${code}" style="display:none">${items}</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+function toggleDeptMenu(code, ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('deptmenu_' + code);
+  const btn = document.getElementById('deptbtn_' + code);
+  if (!menu || !btn) return;
+  const isOpen = menu.style.display !== 'none';
+  closeAllDeptMenus();
+  if (!isOpen) {
+    const r = btn.getBoundingClientRect();
+    menu.style.display = 'block';
+    menu.style.top = r.bottom + 'px';
+    let left = r.left;
+    const mw = menu.offsetWidth;
+    if (left + mw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - mw - 8);
+    menu.style.left = left + 'px';
+  }
+}
+function closeAllDeptMenus() {
+  document.querySelectorAll('.nav-dept-menu').forEach(m => m.style.display = 'none');
+}
+function openPerson(key) {
+  closeAllDeptMenus();
+  showPage('person_' + key);
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest || !e.target.closest('.nav-dept')) closeAllDeptMenus();
+});
+
 function renderFunnel() {
   const el = document.getElementById('funnelChart');
   if (!el) return;
 
   // Build sorted member data
-  const data = MEMBERS.map((name, idx) => {
+  const data = filteredMembers().map((name, idx) => {
     const total = calcTotal(name);
     const grade = getGrade(total);
-    return { name, total, grade, color: AVATAR_COLORS[idx] };
+    return { name, total, grade, color: colorFor(name) };
   }).sort((a, b) => b.total - a.total);
 
   const maxPct = Math.max(...data.map(d => d.total), 1);
@@ -1611,7 +1832,7 @@ function renderFunnel() {
       <!-- name inside funnel -->
       <text x="${x0 + barW/2 + 10}" y="${y0 + sliceH/2 + 5}" text-anchor="middle"
         font-size="13" font-weight="700" fill="white" style="text-shadow:0 1px 3px rgba(0,0,0,.4)">
-        ${d.name}
+        ${displayName(d.name)}
       </text>
 
       <!-- left label: grade -->
@@ -1643,15 +1864,22 @@ function renderTeamRadar() {
   if (radarChart) radarChart.destroy();
 
   const labels = KPI_SECTIONS.map(s => s.name);
-  const datasets = MEMBERS.map((name, idx) => ({
-    label: name,
-    data: KPI_SECTIONS.map((_, si) => calcSection(name, si).toFixed(1)),
-    backgroundColor: AVATAR_COLORS[idx] + '22',
-    borderColor: AVATAR_COLORS[idx],
-    borderWidth: 2,
-    pointBackgroundColor: AVATAR_COLORS[idx],
-    pointRadius: 4,
-  }));
+  const datasets = Object.keys(DEPARTMENTS).map(code => {
+    if (deptFilter !== 'all' && code !== deptFilter) return null;
+    const mem = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code);
+    if (!mem.length) return null;
+    const col = DEPARTMENTS[code].color;
+    return {
+      label: DEPARTMENTS[code].name,
+      data: KPI_SECTIONS.map((_, si) => {
+        const vals = mem.map(n => calcSection(n, si));
+        return (vals.reduce((a,b)=>a+b,0) / vals.length).toFixed(1);
+      }),
+      backgroundColor: col + '1a',
+      borderColor: col, borderWidth: 2,
+      pointBackgroundColor: col, pointRadius: 3,
+    };
+  }).filter(Boolean);
 
   radarChart = new Chart(ctx, {
     type: 'radar',
@@ -1659,7 +1887,7 @@ function renderTeamRadar() {
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: { r: { min: 0, max: 100, ticks: { stepSize: 20, font: { size: 11 } } } },
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16 } } }
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } }
     }
   });
 }
@@ -1679,7 +1907,7 @@ function renderCompare() {
   }).sort((a,b) => b.total - a.total);
 
   const thead = `<thead><tr>
-    <th>Rank</th><th>ชื่อ</th>
+    <th>Rank</th><th>ชื่อ</th><th>แผนก</th>
     ${KPI_SECTIONS.map(s=>`<th>${s.name}</th>`).join('')}
     <th>รวม</th><th>Grade</th>
   </tr></thead>`;
@@ -1688,7 +1916,8 @@ function renderCompare() {
     const rankClass = ['rank-1','rank-2','rank-3'][i] || 'rank-other';
     return `<tr>
       <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
-      <td style="font-weight:700">${d.name}</td>
+      <td style="font-weight:700">${MEMBER_INFO[d.name]?MEMBER_INFO[d.name].eng:d.name}${MEMBER_INFO[d.name]&&MEMBER_INFO[d.name].nick?' ('+MEMBER_INFO[d.name].nick+')':''}</td>
+      <td style="font-size:12px;color:#666">${deptName(d.name)}</td>
       ${d.sections.map(s=>`<td>${s.toFixed(1)}%</td>`).join('')}
       <td style="font-weight:800;color:${barColor(d.total)}">${d.total.toFixed(1)}%</td>
       <td><span class="grade-badge ${gradeClass(d.grade)}">${d.grade}</span></td>
@@ -1701,22 +1930,24 @@ function renderCompare() {
   const ctx = document.getElementById('compareBarChart').getContext('2d');
   if (compareChart) compareChart.destroy();
 
+  const barData = memberData;
   compareChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: MEMBERS,
-      datasets: KPI_SECTIONS.map((sec, si) => ({
-        label: sec.name,
-        data: MEMBERS.map(name => calcSection(name, si).toFixed(1)),
-        backgroundColor: ['#0078d4','#107c10','#8764b8','#ca5010'][si] + 'cc',
-        borderColor: ['#0078d4','#107c10','#8764b8','#ca5010'][si],
+      labels: barData.map(d => displayName(d.name)),
+      datasets: [{
+        label: 'คะแนนรวม (%)',
+        data: barData.map(d => d.total.toFixed(1)),
+        backgroundColor: barData.map(d => colorFor(d.name) + 'cc'),
+        borderColor: barData.map(d => colorFor(d.name)),
         borderWidth: 1, borderRadius: 4,
-      }))
+      }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: false }, y: { min:0, max:100, ticks: { callback: v => v+'%' } } },
-      plugins: { legend: { position: 'bottom' } }
+      scales: { x: { ticks: { font: { size: 10 }, maxRotation: 90, minRotation: 55 } },
+                y: { min:0, max:100, ticks: { callback: v => v+'%' } } },
+      plugins: { legend: { display: false } }
     }
   });
 }
@@ -1736,10 +1967,10 @@ function buildPersonPages() {
     div.innerHTML = `
       <div class="page-actions">
         <button class="btn btn-primary" onclick="updatePersonView('${name}')">🔄 คำนวณใหม่</button>
-        <button class="btn btn-success" onclick="saveAll()">💾 บันทึก</button>
+        <button class="btn btn-success btn-save-round" onclick="saveAll()">💾 บันทึก</button>
         <button class="btn btn-secondary admin-only" onclick="showHistoryModal('${name}')">📋 ประวัติ</button>
         <button class="btn btn-export admin-only" onclick="exportReport('${name}')">📄 Export Report</button>
-        <span class="last-saved">${localStorage.getItem('kpi2026_saved') ? 'บันทึกเมื่อ: '+localStorage.getItem('kpi2026_saved') : ''}</span>
+        <span class="last-saved">${localStorage.getItem(rkey('saved')) ? 'บันทึกเมื่อ: '+localStorage.getItem(rkey('saved')) : ''}</span>
       </div>
       <div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
         <!-- LEFT: KRA Funnel -->
@@ -2112,6 +2343,7 @@ function rebuildSectionTbodyForAllMembers(si) {
 
 function onScoreChange(name, no, el) {
   const val = parseInt(el.value);
+  if (!scores[name]) scores[name] = {};
   scores[name][no] = val > 0 ? val : null;
   const key = no.replace(/\./g,'_');
   const totalCell = document.getElementById(`total_${name}_${key}`);
@@ -2146,6 +2378,7 @@ function onScoreChange(name, no, el) {
 }
 
 function clearScore(name, no) {
+  if (!scores[name]) scores[name] = {};
   scores[name][no] = null;
   const radioName = `score_${name}_${no.replace(/\./g,'_')}`;
   document.querySelectorAll(`input[name="${radioName}"]`).forEach(r => r.checked = false);
@@ -2199,7 +2432,7 @@ let disabled = {};
 function loadDisabled() {
   try {
     const saved = localStorage.getItem('kpi2026_disabled');
-    if (saved) disabled = JSON.parse(saved);
+    if (saved) { disabled = JSON.parse(saved); migrateKeys(disabled); }
   } catch(e) { disabled = {}; }
 }
 
@@ -2211,7 +2444,7 @@ let customWeights = {}; // customWeights[member][no] = override weight (0.0–1.
 function loadCustomWeights() {
   try {
     const saved = localStorage.getItem('kpi2026_weights');
-    if (saved) customWeights = JSON.parse(saved);
+    if (saved) { customWeights = JSON.parse(saved); migrateKeys(customWeights); }
   } catch(e) { customWeights = {}; }
 }
 
@@ -2420,7 +2653,9 @@ function updatePersonView(name) {
   panel.innerHTML = `
     <div style="margin-right:8px">
       <div class="big-score">${total.toFixed(1)}<span style="font-size:22px">%</span></div>
-      <div style="font-size:14px;opacity:.85;margin-top:4px">${name}</div>
+      <div style="font-size:15px;font-weight:700;margin-top:4px">${fullName(name)}</div>
+      <div style="font-size:12px;opacity:.85">${MEMBER_INFO[name]?MEMBER_INFO[name].eng:''}${MEMBER_INFO[name]&&MEMBER_INFO[name].nick?' · '+MEMBER_INFO[name].nick:''}</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px">${deptName(name)}${MEMBER_INFO[name]&&MEMBER_INFO[name].pos?' · '+MEMBER_INFO[name].pos:''}</div>
     </div>
     <div style="margin-right:24px;text-align:center">
       <div class="grade-display">${grade}</div>
@@ -2479,8 +2714,7 @@ function renderPersonFunnel(name) {
         transform="rotate(-90 ${cx} ${cy})"/>`;
   }).join('');
 
-  const memberIdx = MEMBERS.indexOf(name);
-  const totalColor = memberIdx >= 0 ? AVATAR_COLORS[memberIdx] : '#0078d4';
+  const totalColor = colorFor(name);
   const total = calcTotal(name);
   const grade = getGrade(total);
 
@@ -2531,8 +2765,8 @@ let saveHistoryData = {};
 
 function loadSaveHistory() {
   try {
-    const saved = localStorage.getItem('kpi2026_history');
-    if (saved) saveHistoryData = JSON.parse(saved);
+    const saved = localStorage.getItem(rkey('history'));
+    if (saved) { saveHistoryData = JSON.parse(saved); migrateKeys(saveHistoryData); }
   } catch(e) { saveHistoryData = {}; }
 }
 
@@ -2547,7 +2781,7 @@ function recordHistory(name) {
   };
   saveHistoryData[name].unshift(entry);
   if (saveHistoryData[name].length > 30) saveHistoryData[name].length = 30;
-  try { localStorage.setItem('kpi2026_history', JSON.stringify(saveHistoryData)); } catch(e) {}
+  try { localStorage.setItem(rkey('history'), JSON.stringify(saveHistoryData)); } catch(e) {}
 }
 
 function showHistoryModal(name) {
@@ -2598,7 +2832,7 @@ function showHistoryModal(name) {
         <div class="history-head">
           <div>
             <h3>📋 ประวัติการบันทึก</h3>
-            <p>${name} · ${entries.length} รายการ (สูงสุด 30)</p>
+            <p>${fullName(name)} (${displayName(name)}) · ${entries.length} รายการ (สูงสุด 30)</p>
           </div>
           <button class="history-close" onclick="closeHistoryModal()">✕</button>
         </div>
@@ -2681,14 +2915,13 @@ function generateReportHTML(name, histEntry) {
     </div>`;
   }).join('');
 
-  const memberIdx = MEMBERS.indexOf(name);
-  const avatarColor = memberIdx >= 0 ? AVATAR_COLORS[memberIdx] : '#0078d4';
+  const avatarColor = colorFor(name);
 
   return `<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>KPI Report — ${name} — ${dateStr}</title>
+<title>KPI Report — ${fullName(name)} — ${dateStr}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font-size:13px}
@@ -2745,7 +2978,9 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font
     <div class="avatar">${name.slice(0,2).toUpperCase()}</div>
     <div>
       <div class="rpt-title">KPI Evaluation Report · Microsoft Team · 2026</div>
-      <div class="rpt-name">${name}</div>
+      <div class="rpt-name">${fullName(name)}</div>
+      <div style="font-size:12px;opacity:.85">${MEMBER_INFO[name]?MEMBER_INFO[name].eng:''}${MEMBER_INFO[name]&&MEMBER_INFO[name].nick?' · '+MEMBER_INFO[name].nick:''} · ${deptName(name)}</div>
+      <div style="font-size:11px;opacity:.8">${MEMBER_INFO[name]&&MEMBER_INFO[name].pos?MEMBER_INFO[name].pos:''}</div>
       <div class="rpt-date">วันที่ประเมิน: ${dateStr} · ${timeStr}</div>
     </div>
     <div class="rpt-meta">
@@ -2907,6 +3142,10 @@ function showPage(id) {
     const onclick = btn.getAttribute('onclick') || '';
     if (onclick.includes(`'${id}'`)) btn.classList.add('active');
   });
+  if (id.indexOf('person_') === 0) {
+    const info = MEMBER_INFO[id.slice(7)];
+    if (info) { const db = document.getElementById('deptbtn_' + info.dept); if (db) db.classList.add('active'); }
+  }
 
   if (id === 'dashboard') renderDashboard();
   if (id === 'compare') renderCompare();
