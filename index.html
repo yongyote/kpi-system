@@ -6,6 +6,8 @@
 <title>KPI Evaluation System 2026 — Microsoft Team</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --primary: #0078d4;
@@ -1969,7 +1971,8 @@ function buildPersonPages() {
         <button class="btn btn-primary" onclick="updatePersonView('${name}')">🔄 คำนวณใหม่</button>
         <button class="btn btn-success btn-save-round" onclick="saveAll()">💾 บันทึก</button>
         <button class="btn btn-secondary admin-only" onclick="showHistoryModal('${name}')">📋 ประวัติ</button>
-        <button class="btn btn-export admin-only" onclick="exportReport('${name}')">📄 Export Report</button>
+        <button class="btn btn-export admin-only" onclick="downloadPDF('${name}')">⬇️ PDF</button>
+        <button class="btn btn-export admin-only" onclick="downloadExcel('${name}')">⬇️ Excel</button>
         <span class="last-saved">${localStorage.getItem(rkey('saved')) ? 'บันทึกเมื่อ: '+localStorage.getItem(rkey('saved')) : ''}</span>
       </div>
       <div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
@@ -3024,6 +3027,75 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font
 </div>
 </body>
 </html>`;
+}
+
+function _reportFileBase(name){
+  const now = new Date();
+  const ymd = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  const base = ((MEMBER_INFO[name] && MEMBER_INFO[name].eng) ? MEMBER_INFO[name].eng : name).replace(/\s+/g,'_');
+  return base + '_' + (currentRound===1 ? 'Q1' : 'Q4') + '_' + ymd;
+}
+
+async function downloadPDF(name){
+  if (!window.html2pdf){ showToast('⚠️ ไลบรารี PDF ยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง'); return; }
+  showToast('⏳ กำลังสร้าง PDF...');
+  const html = generateReportHTML(name, null);
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;height:1200px;border:0';
+  document.body.appendChild(iframe);
+  iframe.srcdoc = html;
+  await new Promise(res => { iframe.onload = res; });
+  await new Promise(r => setTimeout(r, 400));
+  try {
+    const body = iframe.contentDocument.body;
+    const opt = {
+      margin: 6, filename: _reportFileBase(name) + '.pdf',
+      image: { type: 'jpeg', quality: 0.96 },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 900, backgroundColor: '#f3f6fb' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css','legacy'] }
+    };
+    await html2pdf().set(opt).from(body).save();
+    showToast('📥 ดาวน์โหลด PDF แล้ว');
+  } catch(e){ console.error('PDF failed', e); showToast('⚠️ สร้าง PDF ไม่สำเร็จ'); }
+  finally { iframe.remove(); }
+}
+
+function downloadExcel(name){
+  if (!window.XLSX){ showToast('⚠️ ไลบรารี Excel ยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง'); return; }
+  const info = MEMBER_INFO[name] || {};
+  const total = calcTotal(name), grade = getGrade(total);
+  const aoa = [];
+  aoa.push(['KPI Evaluation Report — ' + ROUND_LABEL[currentRound]]);
+  aoa.push(['ชื่อ', info.thai || name]);
+  aoa.push(['ชื่ออังกฤษ', info.eng || '']);
+  aoa.push(['ชื่อเล่น', info.nick || '']);
+  aoa.push(['ตำแหน่ง', info.pos || '']);
+  aoa.push(['แผนก', deptName(name)]);
+  aoa.push(['คะแนนรวม', total.toFixed(1) + '%', 'Grade', grade]);
+  aoa.push([]);
+  aoa.push(['No.', 'KPI', 'Measurement', 'Weight', 'Score', 'Total']);
+  KPI_SECTIONS.forEach((sec, si) => {
+    aoa.push(['KRA ' + sec.no + ': ' + sec.name, '', '', '', '', calcSection(name, si).toFixed(1) + '%']);
+    sec.items.forEach(item => {
+      if (isDisabled(name, item.no)) return;
+      const w = getItemWeight(name, item.no);
+      const sc = (scores[name] && scores[name][item.no] != null) ? scores[name][item.no] : null;
+      aoa.push([item.no, item.kpi, item.measurement, (w*100).toFixed(0)+'%', sc==null?'-':sc, sc==null?'-':(w*sc).toFixed(2)]);
+    });
+    (customKPIs[sec.id] || []).forEach((ci, idx) => {
+      if (isDisabled(name, ci.id)) return;
+      const w = ci.weight || 0;
+      const sc = (scores[name] && scores[name][ci.id] != null) ? scores[name][ci.id] : null;
+      aoa.push([sec.no + '.C' + (idx+1), ci.kpi || '(Custom KPI)', ci.measurement || '', (w*100).toFixed(0)+'%', sc==null?'-':sc, sc==null?'-':(w*sc).toFixed(2)]);
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:10},{wch:48},{wch:36},{wch:8},{wch:8},{wch:10}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'KPI ' + (currentRound===1 ? 'Q1' : 'Q4'));
+  XLSX.writeFile(wb, _reportFileBase(name) + '.xlsx');
+  showToast('📥 ดาวน์โหลด Excel แล้ว');
 }
 
 async function exportReport(name, histEntry) {
