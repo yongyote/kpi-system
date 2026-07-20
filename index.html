@@ -1,0 +1,2930 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI Evaluation System 2026 — Microsoft Team</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --primary: #0078d4;
+    --primary-dark: #005a9e;
+    --bg: #f3f6fb;
+    --card: #ffffff;
+    --border: #e1e8f0;
+    --text: #1a1a2e;
+    --text-muted: #6b7a99;
+    --ap: #107c10; --ap-bg: #dff6dd;
+    --a:  #0078d4; --a-bg:  #deecf9;
+    --bp: #8764b8; --bp-bg: #f3effc;
+    --b:  #ca5010; --b-bg:  #fff4ce;
+    --c:  #e3008c; --c-bg:  #fde7f3;
+    --d:  #d13438; --d-bg:  #fde7e9;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+    color: white; padding: 20px 32px; display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 2px 8px rgba(0,120,212,0.3);
+  }
+  header .logo { font-size: 28px; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header p { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+  /* NAV TABS */
+  nav {
+    background: var(--card); border-bottom: 2px solid var(--border);
+    padding: 0 24px; display: flex; gap: 4px; overflow-x: auto;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+  }
+  nav button {
+    padding: 14px 20px; border: none; background: none; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: var(--text-muted);
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  nav button:hover { color: var(--primary); background: #f0f7ff; border-radius: 8px 8px 0 0; }
+  nav button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+
+  /* MAIN */
+  main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+
+  /* PAGE */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* CARDS */
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .grid-6 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+
+  /* MEMBER CARD (dashboard) */
+  .member-card {
+    background: var(--card); border-radius: var(--radius); padding: 20px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .member-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+  .member-card .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: white; margin-bottom: 12px;
+  }
+  .member-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .member-card .total-score { font-size: 28px; font-weight: 800; margin: 8px 0 4px; }
+  .member-card .grade-badge {
+    display: inline-block; padding: 3px 12px; border-radius: 20px;
+    font-size: 13px; font-weight: 700; margin-bottom: 12px;
+  }
+  .section-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .section-bar { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+  .section-bar .label { width: 32px; flex-shrink: 0; font-weight: 600; }
+  .bar-track { flex: 1; height: 6px; background: #e8edf5; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .section-bar .pct { width: 32px; text-align: right; font-weight: 600; }
+
+  /* GRADE COLORS */
+  .grade-ap { color: var(--ap); background: var(--ap-bg); }
+  .grade-a  { color: var(--a);  background: var(--a-bg);  }
+  .grade-bp { color: var(--bp); background: var(--bp-bg); }
+  .grade-b  { color: var(--b);  background: var(--b-bg);  }
+  .grade-c  { color: var(--c);  background: var(--c-bg);  }
+  .grade-d  { color: var(--d);  background: var(--d-bg);  }
+
+  /* KPI TABLE */
+  .kpi-section { margin-bottom: 16px; }
+  .kpi-section-header {
+    background: linear-gradient(90deg, var(--primary) 0%, #005a9e 100%);
+    color: white; padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none; transition: border-radius 0.2s;
+  }
+  .kpi-section-header.open { border-radius: 8px 8px 0 0; }
+  .kpi-section-total { font-size: 15px; font-weight: 800; }
+  .sec-chevron { font-size: 14px; transition: transform 0.25s; display: inline-block; margin-right: 8px; }
+  .kpi-section-body { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+  .kpi-section-body.open { max-height: 9999px; }
+  table.kpi-table { width: 100%; border-collapse: collapse; background: var(--card); font-size: 13px; }
+  table.kpi-table th {
+    background: #f0f7ff; padding: 9px 12px; text-align: left;
+    font-weight: 600; color: var(--text-muted); border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  table.kpi-table td {
+    padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  table.kpi-table tr:last-child td { border-bottom: none; }
+  table.kpi-table tr:hover td { background: #f8fbff; }
+  .no-col { width: 48px; color: var(--primary); font-weight: 700; }
+  .kpi-text { line-height: 1.5; }
+  .freq-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; background: #e8f4fd; color: #0078d4;
+  }
+  .weight-cell { font-weight: 700; color: var(--primary); text-align: center; }
+  /* Score Checkboxes */
+  .score-group { display: flex; gap: 4px; align-items: center; }
+  .score-label-wrap { display: inline-flex; }
+  .score-cb { display: none; }
+  .score-label {
+    width: 34px; height: 34px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border: 2px solid #ddd; border-radius: 7px;
+    color: #bbb; cursor: pointer; transition: all 0.15s; background: white;
+    user-select: none; gap: 1px; position: relative;
+  }
+  .score-label .cb-check { font-size: 9px; line-height: 1; opacity: 0; position: absolute; top: 3px; right: 4px; }
+  .score-label .cb-num { font-size: 14px; font-weight: 800; line-height: 1; }
+  .score-label:hover { border-color: #0078d4; color: #0078d4; transform: scale(1.08); background: #f0f7ff; }
+  .score-cb:checked + .score-label .cb-check { opacity: 1; }
+  /* Colors per score when checked */
+  .score-cb:checked + .score-label.scb-s5 { background:#dff6dd; border-color:#107c10; color:#107c10; box-shadow:0 0 0 2px #a8d5a288; }
+  .score-cb:checked + .score-label.scb-s4 { background:#deecf9; border-color:#0078d4; color:#0078d4; box-shadow:0 0 0 2px #90caf988; }
+  .score-cb:checked + .score-label.scb-s3 { background:#fff4ec; border-color:#ca5010; color:#ca5010; box-shadow:0 0 0 2px #f9a87a88; }
+  .score-cb:checked + .score-label.scb-s2 { background:#fef0f9; border-color:#e3008c; color:#e3008c; box-shadow:0 0 0 2px #f7a8d088; }
+  .score-cb:checked + .score-label.scb-s1 { background:#fef2f2; border-color:#d13438; color:#d13438; box-shadow:0 0 0 2px #f5a3a588; }
+  .score-clear-btn {
+    width: 24px; height: 24px; border: 1px solid #ddd; background: none;
+    border-radius: 5px; cursor: pointer; font-size: 11px; color: #bbb;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+    transition: all 0.15s; margin-left: 2px;
+  }
+  .score-clear-btn:hover { border-color: #d13438; color: #d13438; background: #fef2f2; }
+  .total-cell { font-weight: 700; text-align: center; font-size: 14px; }
+
+  /* EVIDENCE */
+  .ev-toggle-btn {
+    display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+    padding: 3px 10px; border: 1px solid #c7dfff; border-radius: 12px;
+    background: #f0f7ff; color: #0078d4; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .ev-toggle-btn:hover { background: #deecf9; border-color: #0078d4; }
+  .ev-toggle-btn.has-ev { background: #e6f4ea; border-color: #a8d5a2; color: #107c10; }
+  .evidence-row td { padding: 0 !important; }
+  .evidence-panel {
+    padding: 14px 16px 16px 52px; background: #f8fbff;
+    border-top: 2px dashed #c7dfff; display: flex; flex-direction: column; gap: 12px;
+  }
+  .ev-section-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+  .ev-notes-area {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical;
+    min-height: 56px; outline: none; transition: border-color 0.2s; background: white;
+  }
+  .ev-notes-area:focus { border-color: var(--primary); }
+  .ev-img-gallery { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .ev-img-thumb {
+    position: relative; width: 88px; height: 88px; border-radius: 8px;
+    overflow: hidden; border: 2px solid var(--border); cursor: zoom-in; background: #eee; flex-shrink: 0;
+  }
+  .ev-img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ev-img-name {
+    position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.55);
+    color: white; font-size: 9px; padding: 2px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ev-remove {
+    position: absolute; top: 3px; right: 3px; width: 20px; height: 20px;
+    background: rgba(209,52,56,0.9); color: white; border: none; border-radius: 50%;
+    font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s; padding: 0; line-height: 1;
+  }
+  .ev-img-thumb:hover .ev-remove { opacity: 1; }
+  .ev-add-img-btn {
+    width: 88px; height: 88px; border: 2px dashed #c7dfff; border-radius: 8px;
+    background: #f0f7ff; color: #0078d4; font-size: 11px; font-weight: 600;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 4px; transition: all 0.15s; flex-shrink: 0;
+  }
+  .ev-add-img-btn:hover { border-color: #0078d4; background: #deecf9; }
+  .ev-add-img-btn .add-icon { font-size: 22px; }
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+    z-index: 9999; align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+  .lightbox-close { position: absolute; top: 18px; right: 24px; color: white; font-size: 36px; cursor: pointer; line-height: 1; font-weight: 300; }
+  .lightbox-name { position: absolute; bottom: 20px; color: rgba(255,255,255,0.8); font-size: 13px; }
+
+  /* MEASUREMENT CUSTOM ITEMS */
+  .meas-custom-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .meas-item-row { display: flex; align-items: center; gap: 5px; }
+  .meas-bullet { color: var(--primary); font-weight: 800; font-size: 14px; flex-shrink: 0; line-height: 1; }
+  .meas-item-input {
+    flex: 1; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 12px; font-family: inherit; outline: none; min-width: 0;
+    transition: border-color 0.2s; background: white; color: var(--text);
+  }
+  .meas-item-input:focus { border-color: var(--primary); background: #f8fbff; }
+  .meas-item-del {
+    width: 18px; height: 18px; border: none; background: none; color: #ccc;
+    cursor: pointer; font-size: 10px; padding: 0; display: flex; align-items: center;
+    justify-content: center; border-radius: 4px; flex-shrink: 0; transition: all 0.15s;
+  }
+  .meas-item-del:hover { color: #d13438; background: #fef2f2; }
+  .meas-add-btn {
+    display: inline-flex; align-items: center; gap: 2px; margin-top: 5px;
+    padding: 2px 9px; border: 1px dashed #c7dfff; border-radius: 10px;
+    background: none; color: #0078d4; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .meas-add-btn:hover { background: #f0f7ff; border-color: #0078d4; }
+
+  /* N/A TOGGLE */
+  .na-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 18px; border-radius: 9px; border: 1.5px solid #a8d5a2;
+    background: #dff6dd; color: #107c10; font-size: 9px; font-weight: 800;
+    cursor: pointer; transition: all 0.15s; padding: 0; margin-top: 5px;
+    letter-spacing: 0.3px;
+  }
+  .na-btn.na-on { background: #f0f0f0; border-color: #bbb; color: #999; }
+  .na-btn:hover { transform: scale(1.08); }
+  /* Weight add button */
+  .weight-add-btn, .weight-rem-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; border: none;
+    color: white; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s; padding: 0; margin-left: 3px;
+    line-height: 1; vertical-align: middle;
+  }
+  .weight-add-btn { background: #d13438; }
+  .weight-add-btn:hover { background: #a80000; transform: scale(1.15); }
+  .weight-rem-btn { background: #ca5010; }
+  .weight-rem-btn:hover { background: #8e3700; transform: scale(1.15); }
+  .weight-custom { color: #107c10 !important; font-weight: 800 !important; }
+  /* Section action buttons */
+  .sec-save-btn, .sec-reset-btn {
+    padding: 4px 11px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .sec-save-btn {
+    border: 1px solid rgba(255,255,255,0.4); color: white;
+    background: rgba(255,255,255,0.15);
+  }
+  .sec-save-btn:hover { background: rgba(255,255,255,0.3); }
+  .sec-save-btn.saved { background: rgba(16,124,16,0.5); border-color: rgba(100,220,100,0.5); }
+  .sec-reset-btn {
+    border: 1px solid rgba(255,210,160,0.5); color: #ffe0b2;
+    background: rgba(255,140,50,0.2);
+  }
+  .sec-reset-btn:hover { background: rgba(255,140,50,0.4); }
+  /* Disabled KPI row */
+  .kpi-row-disabled > td { opacity: 0.3; pointer-events: none; background: #f7f8fa !important; }
+  .kpi-row-disabled > td:first-child { opacity: 1 !important; pointer-events: auto; }
+  /* Weight warning badge */
+  .weight-ok  { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.65); }
+  .weight-warn {
+    font-size: 11px; font-weight: 800; background: rgba(255,170,0,0.25);
+    color: #ffe066; padding: 2px 9px; border-radius: 8px;
+    border: 1px solid rgba(255,200,0,0.4); white-space: nowrap;
+  }
+
+  /* SCORE REASON (score=5) */
+  .score-reason { margin-top: 8px; text-align: left; }
+  .score-reason-label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700; color: #107c10; margin-bottom: 4px;
+  }
+  .score-reason-input {
+    width: 100%; padding: 6px 10px; border: 1.5px solid #a8d5a2;
+    border-radius: 8px; font-size: 12px; font-family: inherit; resize: vertical;
+    min-height: 54px; outline: none; background: #f1faf1; color: var(--text);
+    transition: border-color 0.2s; line-height: 1.5;
+  }
+  .score-reason-input:focus { border-color: #107c10; background: #e8f5e9; }
+  .score-reason-input::placeholder { color: #a8d5a2; }
+
+  /* SUMMARY ROW */
+  .section-summary-row td {
+    background: #f0f7ff; font-weight: 700; font-size: 13px;
+    border-top: 2px solid var(--primary); padding: 10px 12px;
+  }
+
+  /* SCORE SUMMARY PANEL */
+  .score-panel {
+    display: flex; align-items: center; gap: 24px;
+    background: linear-gradient(135deg, #0078d4 0%, #00b4d8 100%);
+    color: white; border-radius: var(--radius); padding: 20px 28px;
+    margin-bottom: 24px; box-shadow: 0 4px 16px rgba(0,120,212,0.25);
+  }
+  .score-panel .big-score { font-size: 52px; font-weight: 900; line-height: 1; }
+  .score-panel .grade-display { font-size: 32px; font-weight: 900; }
+  .score-panel .grade-label { font-size: 13px; opacity: 0.85; }
+  .score-panel .sections { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .score-panel .sec-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .score-panel .sec-name { width: 240px; opacity: 0.9; }
+  .score-panel .sec-bar-track { flex: 1; height: 8px; background: rgba(255,255,255,0.25); border-radius: 4px; overflow: hidden; }
+  .score-panel .sec-bar-fill { height: 100%; background: white; border-radius: 4px; transition: width 0.5s; }
+  .score-panel .sec-pct { width: 44px; text-align: right; font-weight: 700; }
+
+  /* GRADE TABLE */
+  .grade-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .grade-item { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+
+  /* CHART */
+  .chart-container { position: relative; height: 280px; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 9px 20px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary { background: #f0f7ff; color: var(--primary); border: 1px solid #c7dfff; }
+  .btn-secondary:hover { background: #deecf9; }
+  .btn-success { background: #107c10; color: white; }
+  .btn-success:hover { background: #0b5a0b; }
+
+  /* ACTIONS */
+  .page-actions { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+  .last-saved { font-size: 12px; color: var(--text-muted); }
+
+  /* COMPARE TABLE */
+  table.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.compare-table th {
+    background: #f0f7ff; padding: 10px 14px; font-weight: 700; border-bottom: 2px solid var(--border); text-align: center;
+  }
+  table.compare-table th:first-child { text-align: left; }
+  table.compare-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: center; }
+  table.compare-table td:first-child { text-align: left; font-weight: 600; }
+  table.compare-table tr:hover td { background: #f8fbff; }
+  table.compare-table .best { color: #107c10; font-weight: 800; }
+  .rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; font-weight: 700; }
+  .rank-1 { background: #ffd700; color: #7a5c00; }
+  .rank-2 { background: #c0c0c0; color: #444; }
+  .rank-3 { background: #cd7f32; color: white; }
+  .rank-other { background: #e8edf5; color: #6b7a99; }
+
+  /* ── CUSTOM KPI ROW ── */
+  .kpi-custom-row > td { background: #fdf8ff !important; }
+  .kpi-field-input {
+    width: 100%; padding: 5px 8px; border: 1px solid #d8c8f0;
+    border-radius: 6px; font-size: 12px; font-family: inherit;
+    outline: none; background: white; color: var(--text);
+    transition: border-color 0.2s; box-sizing: border-box;
+  }
+  .kpi-field-input:focus { border-color: #8764b8; background: #fdf8ff; }
+  .kpi-field-input::placeholder { color: #c4aee0; }
+  .kpi-custom-del-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border: none; background: none; color: #bbb;
+    cursor: pointer; font-size: 17px; padding: 0; border-radius: 6px;
+    transition: all 0.15s; margin-top: 4px;
+  }
+  .kpi-custom-del-btn:hover { color: #d13438; background: #fef2f2; }
+  .add-kpi-row td {
+    padding: 8px 12px !important; border-top: 1px dashed #d8c8f0 !important;
+  }
+  .add-kpi-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 18px; border: 1.5px dashed #c4aee0; border-radius: 8px;
+    background: #fdf8ff; color: #8764b8; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .add-kpi-btn:hover { background: #f3effc; border-color: #8764b8; border-style: solid; }
+
+  /* ── RUBRIC POPOVER ── */
+  .rubric-btn {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 1.5px solid #c7dfff; background: #f0f7ff; color: #0078d4;
+    font-size: 11px; font-weight: 800; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; margin-left: 4px; transition: all 0.15s; line-height: 1; flex-shrink: 0;
+  }
+  .rubric-btn:hover { background: #0078d4; color: white; border-color: #0078d4; }
+  #rubricPopover {
+    position: fixed; z-index: 9990; background: white;
+    border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    border: 1px solid #e1e8f0; min-width: 330px; max-width: 420px;
+    padding: 14px 16px; display: none; pointer-events: auto;
+  }
+  #rubricPopover.visible { display: block; }
+  .rp-header { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #f0f7ff; }
+  .rp-title { font-size: 13px; font-weight: 800; color: #111; line-height: 1.4; }
+  .rp-target { font-size: 11px; color: #0078d4; margin-top: 3px; }
+  .rp-row {
+    display: flex; gap: 9px; align-items: flex-start;
+    padding: 6px 0; border-bottom: 1px solid #f5f6fa;
+  }
+  .rp-row:last-child { border-bottom: none; }
+  .rp-score-badge {
+    width: 26px; height: 26px; border-radius: 7px;
+    font-size: 13px; font-weight: 900; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rp-level-name { font-size: 11px; font-weight: 700; line-height: 1.3; }
+  .rp-level-text { font-size: 11.5px; color: #444; margin-top: 2px; line-height: 1.45; }
+
+  /* ── EXPORT REPORT BUTTON ── */
+  .btn-export {
+    background: linear-gradient(135deg,#8764b8,#6b4fa0); color: white;
+    border: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-export:hover { background: linear-gradient(135deg,#6b4fa0,#4f3280); }
+
+  /* ── HISTORY MODAL ── */
+  .history-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 10000; display: flex; align-items: flex-start; justify-content: flex-end;
+  }
+  .history-panel {
+    width: 420px; max-width: 96vw; height: 100vh; background: white;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+    display: flex; flex-direction: column; animation: slideInRight 0.25s ease;
+  }
+  @keyframes slideInRight { from{transform:translateX(100%)} to{transform:translateX(0)} }
+  .history-head {
+    background: linear-gradient(135deg,#0078d4,#005a9e);
+    color: white; padding: 18px 20px; display: flex; align-items: center;
+    justify-content: space-between; flex-shrink: 0;
+  }
+  .history-head h3 { font-size: 15px; font-weight: 800; margin: 0; }
+  .history-head p  { font-size: 11px; opacity: .8; margin: 2px 0 0; }
+  .history-close {
+    width: 30px; height: 30px; border: 1.5px solid rgba(255,255,255,.4);
+    background: rgba(255,255,255,.15); color: white; border-radius: 8px;
+    font-size: 16px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; padding: 0; transition: background 0.15s; flex-shrink: 0;
+  }
+  .history-close:hover { background: rgba(255,255,255,.3); }
+  .history-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+  .history-empty { color: #aaa; font-size: 13px; text-align: center; margin-top: 40px; }
+  .he-entry {
+    border: 1px solid #e1e8f0; border-radius: 10px; margin-bottom: 10px;
+    overflow: hidden; transition: box-shadow 0.15s;
+  }
+  .he-entry:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .he-main {
+    padding: 11px 14px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; background: #fafbff; user-select: none;
+  }
+  .he-main:hover { background: #f0f7ff; }
+  .he-ts   { flex: 1; font-size: 12px; color: #444; }
+  .he-ts strong { display: block; font-size: 13px; color: #111; }
+  .he-score { font-size: 18px; font-weight: 900; }
+  .he-grade { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 12px; }
+  .he-caret { font-size: 11px; color: #bbb; transition: transform 0.2s; }
+  .he-entry.open .he-caret { transform: rotate(90deg); }
+  .he-detail {
+    padding: 10px 14px 14px; background: white;
+    border-top: 1px solid #e8edf5; display: none;
+  }
+  .he-entry.open .he-detail { display: block; }
+  .he-kra-bars { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .he-kra-row  { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #555; }
+  .he-kra-label { width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .he-kra-track { flex: 1; height: 6px; background: #e8edf5; border-radius: 3px; overflow: hidden; }
+  .he-kra-fill  { height: 100%; border-radius: 3px; }
+  .he-kra-pct   { width: 36px; text-align: right; font-weight: 700; }
+  .he-actions { display: flex; gap: 8px; }
+  .he-restore-btn {
+    flex: 1; padding: 7px; border: 1.5px solid #c7dfff; border-radius: 8px;
+    background: #f0f7ff; color: #0078d4; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .he-restore-btn:hover { background: #deecf9; border-color: #0078d4; }
+  .he-export-btn {
+    flex: 1; padding: 7px; border: 1.5px solid #d8c8f0; border-radius: 8px;
+    background: #f3effc; color: #8764b8; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .he-export-btn:hover { background: #ede4f9; border-color: #8764b8; }
+
+  /* ====================================================
+     LOGIN OVERLAY
+     ==================================================== */
+  #loginOverlay {
+    position: fixed; inset: 0; z-index: 99999;
+    background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-card {
+    background: white; border-radius: 20px;
+    padding: 40px 48px; width: 400px; max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: fadeInUp 0.35s ease;
+  }
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+  .login-logo { text-align: center; font-size: 48px; margin-bottom: 6px; }
+  .login-title { text-align: center; font-size: 21px; font-weight: 800; color: #1a1a2e; margin-bottom: 4px; }
+  .login-sub { text-align: center; font-size: 13px; color: #6b7a99; margin-bottom: 28px; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 12px; font-weight: 700; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .login-field input {
+    width: 100%; padding: 11px 14px; border: 1.5px solid #d0d9e8; border-radius: 10px;
+    font-size: 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit; color: #1a1a2e;
+  }
+  .login-field input:focus { border-color: #0078d4; box-shadow: 0 0 0 3px rgba(0,120,212,0.12); }
+  .login-btn {
+    width: 100%; padding: 13px; background: linear-gradient(135deg, #0078d4, #005a9e);
+    color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; margin-top: 8px; font-family: inherit;
+  }
+  .login-btn:hover { background: linear-gradient(135deg, #005a9e, #003d7a); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,90,158,0.35); }
+  .login-btn:active { transform: translateY(0); }
+  .login-error { color: #d13438; font-size: 12px; text-align: center; margin-top: 12px; min-height: 18px; font-weight: 600; }
+  .login-divider { border: none; border-top: 1px solid #edf0f5; margin: 20px 0 16px; }
+  .login-accounts { background: #f8fafd; border-radius: 10px; padding: 12px 14px; }
+  .login-accounts-title { font-size: 11px; font-weight: 700; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .login-account-row { display: flex; justify-content: space-between; font-size: 12px; color: #555; padding: 2px 0; }
+  .login-account-row span:first-child { font-weight: 700; color: #333; }
+  .login-account-row span:last-child { color: #0078d4; font-family: monospace; }
+  /* HEADER USER INFO */
+  #headerUser { align-items: center; gap: 12px; }
+  .header-logout-btn {
+    padding: 6px 16px; background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.4); color: white; border-radius: 8px;
+    font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.15s;
+    font-family: inherit;
+  }
+  .header-logout-btn:hover { background: rgba(255,255,255,0.32); }
+  /* MEMBER-MODE: hide admin-only elements */
+  body.member-mode .admin-only { display: none !important; }
+  body.member-mode .weight-cell { pointer-events: none; }
+  body.member-mode .kpi-field-input { pointer-events: none; background: #f8f8fb; color: #555; }
+
+  @media(max-width: 900px) {
+    .grid-6, .grid-3 { grid-template-columns: 1fr 1fr; }
+    .score-panel { flex-direction: column; align-items: flex-start; }
+    .score-panel .sec-name { width: 180px; }
+    .person-layout { grid-template-columns: 1fr !important; }
+  }
+  @media(max-width: 600px) {
+    .grid-6, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    main { padding: 12px; }
+    nav button { padding: 10px 14px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">📊</div>
+    <div class="login-title">KPI Evaluation System 2026</div>
+    <div class="login-sub">Microsoft Team · กรุณาเข้าสู่ระบบ</div>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="loginUsername" placeholder="กรอก username" autocomplete="username"
+        onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="กรอก password" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">🔑 เข้าสู่ระบบ</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">📊</div>
+  <div style="flex:1">
+    <h1>KPI Evaluation System 2026</h1>
+    <p>Microsoft Team · ประเมินผลการทำงานประจำปี 2026</p>
+  </div>
+  <div id="headerUser" style="display:none">
+    <span id="headerUserName" style="font-size:13px; opacity:0.9; font-weight:600;"></span>
+    <span id="cloudStatus" style="font-size:12px; opacity:0.85; font-weight:600; display:none;"></span>
+    <button class="header-logout-btn" onclick="doLogout()">ออกจากระบบ</button>
+  </div>
+</header>
+
+<nav id="mainNav">
+  <button class="active" onclick="showPage('dashboard')">🏠 Dashboard</button>
+  <button onclick="showPage('compare')">📈 เปรียบเทียบทีม</button>
+  <button onclick="showPage('person_Pongwit')">Pongwit</button>
+  <button onclick="showPage('person_Ratthawit')">Ratthawit</button>
+  <button onclick="showPage('person_Panupat')">Panupat</button>
+  <button onclick="showPage('person_Natthapas')">Natthapas</button>
+  <button onclick="showPage('person_Nathapong')">Nathapong</button>
+  <button onclick="showPage('person_Namo')">Namo</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h2 style="font-size:20px; font-weight:800;">Team Overview</h2>
+        <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">คลิกที่การ์ดเพื่อดูรายละเอียด KPI แต่ละคน</p>
+      </div>
+      <button class="btn btn-success" onclick="saveAll()">💾 บันทึกข้อมูลทั้งหมด</button>
+    </div>
+    <div class="grid-6" id="dashboardCards"></div>
+
+    <div style="margin-top:24px;" class="card">
+      <div class="card-title">🔽 KPI Performance Funnel</div>
+      <div id="funnelChart" style="padding:8px 0 16px"></div>
+    </div>
+
+    <div style="margin-top:24px;" class="card">
+      <div class="card-title">📊 ภาพรวมคะแนนทีม</div>
+      <div class="chart-container">
+        <canvas id="teamRadarChart"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;" class="card">
+      <div class="card-title">🎯 เกณฑ์การประเมิน</div>
+      <div class="grade-legend">
+        <span class="grade-item grade-ap">A+ · 90–100% · High Performance</span>
+        <span class="grade-item grade-a">A · 80–89% · High Performance</span>
+        <span class="grade-item grade-bp">B+ · 70–79% · Moderate Performance</span>
+        <span class="grade-item grade-b">B · 60–69% · Moderate Performance</span>
+        <span class="grade-item grade-c">C · 50–59% · Low Performance</span>
+        <span class="grade-item grade-d">D · 40–49% · Low Performance</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARE -->
+  <div id="page-compare" class="page">
+    <h2 style="font-size:20px; font-weight:800; margin-bottom:20px;">📈 เปรียบเทียบผลการประเมินทีม</h2>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">คะแนนรวมและ Grade</div>
+      <table class="compare-table" id="compareTable"></table>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 กราฟเปรียบเทียบรายหมวด</div>
+      <div class="chart-container" style="height:320px;">
+        <canvas id="compareBarChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERSON PAGES (generated) -->
+  <div id="personPagesContainer"></div>
+</main>
+
+<!-- RUBRIC POPOVER -->
+<div id="rubricPopover" onmouseenter="clearTimeout(_rubricHideTimer)" onmouseleave="hideRubric(150)"></div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" class="lightbox" onclick="this.classList.remove('open')">
+  <span class="lightbox-close" onclick="document.getElementById('lightbox').classList.remove('open')">✕</span>
+  <img src="" alt="evidence" onclick="event.stopPropagation()">
+  <span class="lightbox-name" id="lightboxName"></span>
+</div>
+
+<script>
+// ============================================================
+// CLOUD SYNC (Supabase) — shared central data for the whole team
+// ------------------------------------------------------------
+// HOW IT WORKS:
+//   - All app data is kept in localStorage exactly as before (offline cache).
+//   - When CLOUD is configured below, the app pulls the shared copy from
+//     Supabase on load, and pushes back every time you press "บันทึก".
+//   - If CLOUD.url is empty, the app runs 100% locally (old behaviour).
+//
+// SETUP: fill in url + anonKey from your Supabase project, then run the SQL
+//        in SETUP_SHARED_APP.md. Leave blank to disable cloud sync.
+// ============================================================
+const CLOUD = {
+  url:     'https://bwqllluollhgmwwkizcq.supabase.co',   // Project_KPI
+  anonKey: 'sb_publishable_g564fm4zQOyrkA8yIETgcQ_SCod_ArE',   // publishable key (safe for browser + RLS is on)
+  docId:   'kpi2026',   // one shared document row for this evaluation cycle
+};
+
+// localStorage keys that make up the full shared state
+const CLOUD_KEYS = [
+  'kpi2026_scores', 'kpi2026_disabled', 'kpi2026_weights',
+  'kpi2026_customKPIs', 'kpi2026_evidence', 'kpi2026_history', 'kpi2026_saved',
+];
+
+let _sb = null;
+function cloudEnabled() { return !!(CLOUD.url && CLOUD.anonKey && window.supabase); }
+
+function cloudInit() {
+  if (!cloudEnabled()) { setCloudStatus('local'); return false; }
+  try {
+    _sb = window.supabase.createClient(CLOUD.url, CLOUD.anonKey);
+    return true;
+  } catch (e) {
+    console.error('cloudInit failed', e);
+    setCloudStatus('error');
+    return false;
+  }
+}
+
+// Pull shared state from cloud into localStorage (call before loadAllLocal)
+async function cloudPull() {
+  if (!_sb) return false;
+  setCloudStatus('syncing');
+  try {
+    const { data, error } = await _sb
+      .from('kpi_state').select('data').eq('id', CLOUD.docId).maybeSingle();
+    if (error) throw error;
+    if (data && data.data) {
+      const blob = data.data;
+      CLOUD_KEYS.forEach(k => {
+        if (blob[k] !== undefined && blob[k] !== null) {
+          localStorage.setItem(k, typeof blob[k] === 'string' ? blob[k] : JSON.stringify(blob[k]));
+        }
+      });
+      setCloudStatus('ok');
+      return true;
+    }
+    setCloudStatus('ok');   // no row yet — first run
+    return false;
+  } catch (e) {
+    console.error('cloudPull failed', e);
+    setCloudStatus('error');
+    showToast('⚠️ ดึงข้อมูลจากส่วนกลางไม่สำเร็จ — ใช้ข้อมูลในเครื่อง');
+    return false;
+  }
+}
+
+// Push current localStorage state up to the shared cloud row
+async function cloudPush() {
+  if (!_sb) return false;
+  setCloudStatus('syncing');
+  try {
+    const blob = {};
+    CLOUD_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) { try { blob[k] = JSON.parse(v); } catch (_) { blob[k] = v; } }
+    });
+    const { error } = await _sb.from('kpi_state').upsert({
+      id: CLOUD.docId,
+      data: blob,
+      updated_at: new Date().toISOString(),
+      updated_by: (typeof currentUser === 'object' && currentUser) ? currentUser.name : null,
+    });
+    if (error) throw error;
+    setCloudStatus('ok');
+    return true;
+  } catch (e) {
+    console.error('cloudPush failed', e);
+    setCloudStatus('error');
+    showToast('⚠️ บันทึกขึ้นส่วนกลางไม่สำเร็จ (บันทึกในเครื่องแล้ว)');
+    return false;
+  }
+}
+
+function setCloudStatus(state) {
+  const el = document.getElementById('cloudStatus');
+  if (!el) return;
+  const map = {
+    local:   { t: '', title: '' },
+    syncing: { t: '☁︎ กำลังซิงค์…', title: 'กำลังซิงค์กับส่วนกลาง' },
+    ok:      { t: '☁︎ ซิงค์แล้ว',   title: 'ข้อมูลตรงกับส่วนกลาง' },
+    error:   { t: '⚠️ ออฟไลน์',      title: 'ซิงค์ไม่สำเร็จ — ใช้ข้อมูลในเครื่อง' },
+  };
+  const s = map[state] || map.local;
+  el.textContent = s.t;
+  el.title = s.title;
+  el.style.display = s.t ? 'inline' : 'none';
+}
+
+function loadAllLocal() {
+  loadScores(); loadEvidence(); loadDisabled();
+  loadCustomWeights(); loadCustomKPIs(); loadSaveHistory();
+}
+
+// ============================================================
+// AUTH — Login / Logout / Role
+// ============================================================
+const USERS = {
+  'admin':     { password: 'admin2026',     role: 'admin',  name: 'Admin' },
+  'pongwit':   { password: 'Pongwit2026',   role: 'member', name: 'Pongwit' },
+  'ratthawit': { password: 'Ratthawit2026', role: 'member', name: 'Ratthawit' },
+  'panupat':   { password: 'Panupat2026',   role: 'member', name: 'Panupat' },
+  'natthapas': { password: 'Natthapas2026', role: 'member', name: 'Natthapas' },
+  'nathapong': { password: 'Nathapong2026', role: 'member', name: 'Nathapong' },
+  'namo':      { password: 'Namo2026',      role: 'member', name: 'Namo' },
+};
+
+let currentUser = null;
+
+async function doLogin() {
+  const usernameRaw = document.getElementById('loginUsername').value.trim();
+  const password    = document.getElementById('loginPassword').value;
+  const errEl       = document.getElementById('loginError');
+  const username    = usernameRaw.toLowerCase();
+
+  const user = USERS[username];
+  if (!user || user.password !== password) {
+    errEl.textContent = '❌ Username หรือ Password ไม่ถูกต้อง';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginPassword').focus();
+    const card = document.querySelector('.login-card');
+    card.style.animation = 'none';
+    card.offsetHeight;
+    card.style.animation = 'shake 0.35s ease';
+    return;
+  }
+
+  currentUser = { ...user, username };
+  errEl.textContent = '';
+  document.getElementById('loginOverlay').style.display = 'none';
+
+  const headerUser = document.getElementById('headerUser');
+  headerUser.style.display = 'flex';
+  document.getElementById('headerUserName').textContent =
+    (user.role === 'admin' ? '👑 ' : '👤 ') + user.name;
+
+  await cloudPull();            // fetch shared data first (no-op if cloud off)
+  loadAllLocal();
+  buildPersonPages();
+  applyRoleUI();
+}
+
+function doLogout() {
+  if (!confirm('ออกจากระบบ?')) return;
+  currentUser = null;
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginUsername').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('headerUser').style.display = 'none';
+  document.body.classList.remove('member-mode');
+  document.querySelectorAll('nav button').forEach(b => b.style.display = '');
+}
+
+function applyRoleUI() {
+  if (!currentUser) return;
+  if (currentUser.role === 'admin') {
+    document.body.classList.remove('member-mode');
+    document.querySelectorAll('nav button').forEach(b => b.style.display = '');
+    renderDashboard();
+    showPage('dashboard');
+  } else {
+    const memberName = currentUser.name;
+    document.querySelectorAll('nav button').forEach(btn => {
+      const oc = btn.getAttribute('onclick') || '';
+      if (oc.includes("'dashboard'") || oc.includes("'compare'")) {
+        btn.style.display = 'none';
+      } else if (oc.includes('person_') && !oc.includes(`'person_${memberName}'`)) {
+        btn.style.display = 'none';
+      }
+    });
+    document.body.classList.add('member-mode');
+    showPage('person_' + memberName);
+  }
+}
+
+(function injectShakeKeyframe() {
+  const s = document.createElement('style');
+  s.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}';
+  document.head.appendChild(s);
+})();
+
+// ============================================================
+// DATA MODEL
+// ============================================================
+const KPI_SECTIONS = [
+  {
+    id: 's1', no: 1,
+    name: 'Team Management',
+    nameTh: 'การบริหารทีมและพัฒนาบุคลากร',
+    items: [
+      { no:'1.1', kpi:'สอบเซอร์ครบตามที่ได้รับ Assign ในเวลาที่กำหนดและผ่านภายใน 2 ครั้ง', measurement:'ผ่านครบ 100%', freq:'Yearly', weight:0.2 },
+      { no:'1.2', kpi:'เข้าร่วมกิจกรรม Team Building และการอบรมภายใน', measurement:'เข้าร่วมครบ 100%', freq:'Yearly', weight:0.2 },
+      { no:'1.3', kpi:'ใส่ข้อมูล Task งานทุกงานลงใน Monday', measurement:'ภายใน 24 ชั่วโมงหลังจากได้รับ Case', freq:'Daily', weight:0.1 },
+      { no:'1.4', kpi:'จำนวนชั่วโมงทำงานใน Monday', measurement:'≥ 28 ชั่วโมง/สัปดาห์', freq:'Weekly', weight:0.1 },
+      { no:'1.5', kpi:'Project Lead — ดูแลรับผิดชอบโครงการจนสำเร็จตรงเวลา', measurement:'Junior: ≥4/Q · Mid: ≥2/Q · Senior: ≥2/Q', freq:'Quarterly', weight:0.1 },
+      { no:'1.6', kpi:'ปฏิบัติตามนโยบาย ISO ตามบทบาทหน้าที่ที่กำหนด', measurement:'ผ่านครบ 100%', freq:'Yearly', weight:0.1 },
+      { no:'1.7', kpi:'Supporter ได้คะแนนความพึงพอใจจาก Owner', measurement:'≥ 4.5 คะแนน', freq:'Yearly', weight:0.2 },
+    ]
+  },
+  {
+    id: 's2', no: 2,
+    name: 'Customer / Company',
+    nameTh: 'การดูแลลูกค้าและประสานงาน',
+    items: [
+      { no:'2.1', kpi:'จำนวน Incident ได้รับการแก้ไขภายใน SLA', measurement:'≥ 95% ของ Incident', freq:'Yearly', weight:0.2 },
+      { no:'2.2', kpi:'จำนวน Request ที่ปิดได้ภายในระยะเวลาที่กำหนด', measurement:'≥ 90% ของ Service Request', freq:'per project', weight:0.1 },
+      { no:'2.3', kpi:'ปิดโปรเจ็คพร้อมส่งมอบเอกสาร ถูกต้อง ครบถ้วน ตรงเวลา', measurement:'≥ 90%', freq:'per project', weight:0.1 },
+      { no:'2.4', kpi:'Unplan Downtime', measurement:'≤ 24 ชม./ปี', freq:'Yearly', weight:0.1 },
+      { no:'2.5', kpi:'ตอบกลับ E-mail ขอราคา ภายใน 1 ชั่วโมง', measurement:'≥ 90%', freq:'per request', weight:0.1 },
+      { no:'2.6', kpi:'ส่งราคา E-mail ให้ Sale หลังได้ข้อมูลครบ ภายใน 1 วัน', measurement:'≥ 90%', freq:'per request', weight:0.1 },
+      { no:'2.7', kpi:'ประเมินความพึงพอใจลูกค้าหลังได้รับบริการ', measurement:'คะแนนเฉลี่ย ≥ 4.5/5', freq:'Yearly', weight:0.1 },
+      { no:'2.8', kpi:'ไม่มีความผิดพลาดจนเกิดผลกระทบระดับ Critical', measurement:'0 Critical Errors', freq:'Yearly', weight:0.2 },
+    ]
+  },
+  {
+    id: 's3', no: 3,
+    name: 'Standard Procedure & QA',
+    nameTh: 'การตรวจสอบ ควบคุมคุณภาพ',
+    items: [
+      { no:'3.1', kpi:'Configuration ตาม Best Practice and Security Baseline', measurement:'≥ 95%', freq:'per project', weight:0.2 },
+      { no:'3.2', kpi:'ความถูกต้องของ RFC / RFC ที่ถูก Reject ต้องแก้ถูกต้อง 100% ใน 1 ครั้ง', measurement:'≥ 95%', freq:'per RFC', weight:0.2 },
+      { no:'3.3', kpi:'RFC ที่ดำเนินการต้องเสร็จสมบูรณ์ ไม่ถูก RollBack', measurement:'≥ 95%', freq:'per RFC', weight:0.2 },
+      { no:'3.4', kpi:'ตรวจสอบและอนุมัติ RFC ภายในเวลา', measurement:'≥ 95% ภายใน 1 วันทำการ', freq:'per RFC', weight:0.2 },
+      { no:'3.5', kpi:'Update งานที่ได้รับมอบหมาย, แชร์ปัญหา, Ticket', measurement:'อย่างน้อยสัปดาห์ละ 1 ครั้ง', freq:'Weekly', weight:0.2 },
+    ]
+  },
+  {
+    id: 's4', no: 4,
+    name: 'Business Dev & Innovation',
+    nameTh: 'การพัฒนาธุรกิจและนวัตกรรม',
+    items: [
+      { no:'4.1', kpi:'ทำ CRI Report Analysis จากลูกค้าที่ดูแลอยู่', measurement:'≥ 1 report/ไตรมาส', freq:'Quarterly', weight:0.2 },
+      { no:'4.2', kpi:'จำนวนกิจกรรมที่จัดให้ลูกค้า/ไตรมาส', measurement:'≥ 1–2 ครั้ง/ไตรมาส', freq:'Quarterly', weight:0.2 },
+      { no:'4.3', kpi:'มี New Service หรือ New Product', measurement:'≥ 1 อย่าง/ปี + ลูกค้าซื้อ ≥ 2 ราย', freq:'Yearly', weight:0.2 },
+      { no:'4.4', kpi:'พัฒนาเครื่องมือ/กระบวนการ เพื่อลด workload & เพิ่มประสิทธิภาพ', measurement:'≥ 1 tool/ปี', freq:'Yearly', weight:0.2 },
+      { no:'4.5', kpi:'เสนอปัญหาที่สามารถพัฒนาเป็น Innovation ได้', measurement:'≥ 1 ครั้ง/ปี', freq:'Yearly', weight:0.2 },
+    ]
+  }
+];
+
+// ============================================================
+// KPI RUBRIC — 5-Level Behaviorally Anchored Criteria (Draft v1)
+// ============================================================
+const KPI_RUBRIC = {
+  '1.1': {
+    title: 'สอบเซอร์ครบตามที่ได้รับ Assign ในเวลาที่กำหนดและผ่านภายใน 2 ครั้ง',
+    target: 'ผ่านครบ 100%',
+    levels: {
+      5: 'ผ่านครบ 100% ภายใน 1 ครั้งทุกตัว และเสร็จก่อน deadline ≥ 1 สัปดาห์',
+      4: 'ผ่านครบ 100% ภายใน 2 ครั้ง ตรงตามกำหนด',
+      3: 'ผ่าน 80–99% ภายในกำหนด หรือบางตัวใช้มากกว่า 2 ครั้ง',
+      2: 'ผ่าน 60–79% หรือเกินระยะเวลาที่กำหนด',
+      1: 'ผ่านน้อยกว่า 60% หรือยังไม่ได้สมัครสอบ / ไม่มีแผนการสอบ',
+    }
+  },
+  '1.2': {
+    title: 'เข้าร่วมกิจกรรม Team Building และการอบรมภายใน',
+    target: 'เข้าร่วมครบ 100%',
+    levels: {
+      5: 'เข้าร่วมครบ 100% และมีบทบาทนำ เช่น นำเสนอ / Facilitate กิจกรรม',
+      4: 'เข้าร่วมครบ 100% ตามที่กำหนด ไม่ขาดเลย',
+      3: 'เข้าร่วม 80–99% (ขาด 1 ครั้งด้วยเหตุผลที่ได้รับอนุมัติ)',
+      2: 'เข้าร่วม 60–79% หรือขาดโดยไม่แจ้งล่วงหน้า',
+      1: 'เข้าร่วมน้อยกว่า 60% โดยไม่มีเหตุผลที่ยอมรับได้',
+    }
+  },
+  '1.3': {
+    title: 'ใส่ข้อมูล Task งานทุกงานลงใน Monday',
+    target: 'ภายใน 24 ชั่วโมงหลังจากได้รับ Case',
+    levels: {
+      5: '≥ 98% ของ Task อัปเดตภายใน 24 ชม. พร้อมรายละเอียดครบ (Status, Priority, ETA)',
+      4: '≥ 90% ของ Task อัปเดตภายใน 24 ชม.',
+      3: '≥ 80% ของ Task อัปเดตภายใน 24 ชม.',
+      2: '60–79% ของ Task อัปเดตภายใน 24 ชม. หรือข้อมูลไม่ครบ',
+      1: 'น้อยกว่า 60% หรือ Task หายจำนวนมาก ต้องให้ทีม chase ตลอด',
+    }
+  },
+  '1.4': {
+    title: 'จำนวนชั่วโมงทำงานใน Monday',
+    target: '≥ 28 ชั่วโมง/สัปดาห์',
+    levels: {
+      5: '≥ 35 ชั่วโมง/สัปดาห์ สม่ำเสมอทุกสัปดาห์ตลอดรอบประเมิน',
+      4: '≥ 28 ชั่วโมง/สัปดาห์ ครบทุกสัปดาห์ (100%)',
+      3: '≥ 28 ชั่วโมง/สัปดาห์ ใน ≥ 80% ของสัปดาห์ในรอบประเมิน',
+      2: 'เฉลี่ย 20–27 ชั่วโมง/สัปดาห์',
+      1: 'เฉลี่ยน้อยกว่า 20 ชั่วโมง/สัปดาห์',
+    }
+  },
+  '1.5': {
+    title: 'Project Lead — ดูแลรับผิดชอบโครงการจนสำเร็จตรงเวลา',
+    target: 'Junior ≥4/Q · Mid ≥2/Q · Senior ≥2/Q',
+    levels: {
+      5: 'เกินเป้า ≥ 150% และส่งมอบโครงการก่อนกำหนดทุกโครงการ',
+      4: 'ครบตามเป้าหมาย (Jr ≥4, Mid/Sr ≥2/Q) ตรงเวลา 100%',
+      3: 'ครบตามเป้า แต่บางโครงการล่าช้า ≤ 1 สัปดาห์',
+      2: 'ต่ำกว่าเป้า 50–80% หรือล่าช้ากว่า 1 สัปดาห์บ่อยครั้ง',
+      1: 'ต่ำกว่าเป้าหมายมาก (< 50%) หรือไม่ได้ Lead โครงการเลย',
+    }
+  },
+  '1.6': {
+    title: 'ปฏิบัติตามนโยบาย ISO ตามบทบาทหน้าที่ที่กำหนด',
+    target: 'ผ่านครบ 100%',
+    levels: {
+      5: 'ผ่านครบ 100% และเสนอแนะ / ปรับปรุง Process ISO ได้รับการยอมรับ',
+      4: 'ผ่านครบ 100% ไม่มีข้อบกพร่อง (0 Non-conformance)',
+      3: 'ผ่าน 90–99% มี Minor finding ≤ 1 แต่แก้ไขได้ทันที',
+      2: 'ผ่าน 70–89% มีข้อบกพร่องที่ต้องติดตามแก้ไข',
+      1: 'ผ่านน้อยกว่า 70% หรือไม่ปฏิบัติตามนโยบาย ISO',
+    }
+  },
+  '1.7': {
+    title: 'Supporter ได้คะแนนความพึงพอใจจาก Owner',
+    target: '≥ 4.5/5.0 คะแนน',
+    levels: {
+      5: 'ได้คะแนน ≥ 4.8/5.0 จาก Owner',
+      4: 'ได้คะแนน 4.5–4.79/5.0',
+      3: 'ได้คะแนน 4.0–4.49/5.0',
+      2: 'ได้คะแนน 3.5–3.99/5.0',
+      1: 'ได้คะแนนน้อยกว่า 3.5/5.0',
+    }
+  },
+  '2.1': {
+    title: 'จำนวน Incident ได้รับการแก้ไขภายใน SLA',
+    target: '≥ 95% ของ Incident',
+    levels: {
+      5: '≥ 99% ของ Incident แก้ไขภายใน SLA',
+      4: '95–98.9% ของ Incident แก้ไขภายใน SLA',
+      3: '90–94.9%',
+      2: '80–89.9%',
+      1: 'น้อยกว่า 80% — SLA breach บ่อยมาก',
+    }
+  },
+  '2.2': {
+    title: 'จำนวน Request ที่ปิดได้ภายในระยะเวลาที่กำหนด',
+    target: '≥ 90% ของ Service Request',
+    levels: {
+      5: '≥ 98% ปิดได้ภายในกำหนด',
+      4: '90–97.9%',
+      3: '80–89.9%',
+      2: '70–79.9%',
+      1: 'น้อยกว่า 70%',
+    }
+  },
+  '2.3': {
+    title: 'ปิดโปรเจ็คพร้อมส่งมอบเอกสาร ถูกต้อง ครบถ้วน ตรงเวลา',
+    target: '≥ 90%',
+    levels: {
+      5: '≥ 98% ส่งมอบครบ ถูกต้อง ตรงเวลา ลูกค้า sign-off ไม่มีข้อแก้ไข',
+      4: '90–97.9% ส่งมอบครบตรงเวลา',
+      3: '80–89.9% หรือมีเอกสารขาดเล็กน้อย แต่แก้ไขได้ทันที',
+      2: '70–79.9% หรือเอกสารมีข้อผิดพลาดหลายจุด',
+      1: 'น้อยกว่า 70% หรือลูกค้าปฏิเสธเอกสาร',
+    }
+  },
+  '2.4': {
+    title: 'Unplan Downtime',
+    target: '≤ 24 ชั่วโมง/ปี',
+    levels: {
+      5: '0 ชั่วโมง Unplan Downtime ตลอดทั้งปี',
+      4: '>0 แต่ ≤ 8 ชั่วโมง/ปี',
+      3: '>8 แต่ ≤ 24 ชั่วโมง/ปี (ตามเกณฑ์)',
+      2: '>24 แต่ ≤ 48 ชั่วโมง/ปี',
+      1: '>48 ชั่วโมง/ปี',
+    }
+  },
+  '2.5': {
+    title: 'ตอบกลับ E-mail ขอราคา ภายใน 1 ชั่วโมง',
+    target: '≥ 90%',
+    levels: {
+      5: '≥ 98% ตอบภายใน 1 ชม.',
+      4: '90–97.9%',
+      3: '80–89.9%',
+      2: '70–79.9%',
+      1: 'น้อยกว่า 70%',
+    }
+  },
+  '2.6': {
+    title: 'ส่งราคา E-mail ให้ Sale หลังได้ข้อมูลครบ ภายใน 1 วัน',
+    target: '≥ 90%',
+    levels: {
+      5: '≥ 98% ส่งภายใน 1 วัน',
+      4: '90–97.9%',
+      3: '80–89.9%',
+      2: '70–79.9%',
+      1: 'น้อยกว่า 70%',
+    }
+  },
+  '2.7': {
+    title: 'ประเมินความพึงพอใจลูกค้าหลังได้รับบริการ (CSAT)',
+    target: 'คะแนนเฉลี่ย ≥ 4.5/5',
+    levels: {
+      5: 'ได้คะแนนเฉลี่ย ≥ 4.8/5.0',
+      4: '4.5–4.79/5.0',
+      3: '4.0–4.49/5.0',
+      2: '3.5–3.99/5.0',
+      1: 'น้อยกว่า 3.5/5.0',
+    }
+  },
+  '2.8': {
+    title: 'ไม่มีความผิดพลาดจนเกิดผลกระทบระดับ Critical',
+    target: '0 Critical Errors',
+    levels: {
+      5: '0 Critical Errors และทำ Proactive Prevention มีเอกสาร Risk Mitigation',
+      4: '0 Critical Errors ตลอดรอบประเมิน',
+      3: '1 Critical Error แต่แก้ไขได้ทันที (< 4 ชม.) ไม่กระทบ Business',
+      2: '2 Critical Errors ในรอบประเมิน',
+      1: '≥ 3 Critical Errors หรือ 1 Error ที่กระทบ Business อย่างรุนแรง',
+    }
+  },
+  '3.1': {
+    title: 'Configuration ตาม Best Practice and Security Baseline',
+    target: '≥ 95%',
+    levels: {
+      5: '≥ 99% ตรงตาม Baseline และเสนอปรับปรุง Security Baseline ใหม่',
+      4: '95–98.9%',
+      3: '90–94.9%',
+      2: '80–89.9%',
+      1: 'น้อยกว่า 80%',
+    }
+  },
+  '3.2': {
+    title: 'ความถูกต้องของ RFC / RFC ที่ถูก Reject ต้องแก้ถูกต้อง 100% ใน 1 ครั้ง',
+    target: '≥ 95%',
+    levels: {
+      5: '≥ 99% RFC ถูกต้อง — Reject แก้ได้ใน 1 ครั้งทุกครั้ง',
+      4: '95–98.9%',
+      3: '90–94.9%',
+      2: '80–89.9%',
+      1: 'น้อยกว่า 80%',
+    }
+  },
+  '3.3': {
+    title: 'RFC ที่ดำเนินการต้องเสร็จสมบูรณ์ ไม่ถูก RollBack',
+    target: '≥ 95%',
+    levels: {
+      5: '≥ 99% ไม่มี Rollback เลยตลอดรอบประเมิน',
+      4: '95–98.9%',
+      3: '90–94.9%',
+      2: '80–89.9%',
+      1: 'น้อยกว่า 80%',
+    }
+  },
+  '3.4': {
+    title: 'ตรวจสอบและอนุมัติ RFC ภายในเวลา',
+    target: '≥ 95% ภายใน 1 วันทำการ',
+    levels: {
+      5: '≥ 99% อนุมัติภายใน 4 ชั่วโมง (Same-day ครึ่งวัน)',
+      4: '≥ 95% อนุมัติภายใน 1 วันทำการ',
+      3: '≥ 90% ภายใน 1 วันทำการ',
+      2: '≥ 80% ภายใน 1 วันทำการ',
+      1: 'น้อยกว่า 80% หรือ RFC ค้างนานเกิน 2 วันทำการบ่อยครั้ง',
+    }
+  },
+  '3.5': {
+    title: 'Update งานที่ได้รับมอบหมาย, แชร์ปัญหา, Ticket',
+    target: 'อย่างน้อยสัปดาห์ละ 1 ครั้ง',
+    levels: {
+      5: 'Update ทุกวัน พร้อมแชร์ Knowledge / Lesson Learned ให้ทีม',
+      4: 'Update ≥ 3 ครั้ง/สัปดาห์ สม่ำเสมอ',
+      3: 'Update ≥ 1 ครั้ง/สัปดาห์ ตามเกณฑ์ขั้นต่ำ',
+      2: 'ขาด Update ในบางสัปดาห์ (< 80% ของสัปดาห์ในรอบ)',
+      1: 'แทบไม่ Update เลย หรือต้องให้ทีม Chase ตลอด',
+    }
+  },
+  '4.1': {
+    title: 'ทำ CRI Report Analysis จากลูกค้าที่ดูแลอยู่',
+    target: '≥ 1 report/ไตรมาส',
+    levels: {
+      5: '≥ 2 reports/ไตรมาส มี Insight และข้อเสนอแนะที่นำไปใช้ได้จริง',
+      4: '≥ 1 report/ไตรมาส ครบถ้วน มีข้อเสนอแนะชัดเจน',
+      3: '≥ 1 report/ไตรมาส แต่ขาดรายละเอียดหรือข้อเสนอแนะ',
+      2: 'ส่ง report ไม่ครบทุกไตรมาส (2–3 จาก 4 ไตรมาส)',
+      1: 'ส่ง 0–1 report ตลอดทั้งปี',
+    }
+  },
+  '4.2': {
+    title: 'จำนวนกิจกรรมที่จัดให้ลูกค้า/ไตรมาส',
+    target: '≥ 1–2 ครั้ง/ไตรมาส',
+    levels: {
+      5: '≥ 3 ครั้ง/ไตรมาส ลูกค้าตอบรับดีเยี่ยม มี Feedback เชิงบวก',
+      4: '≥ 2 ครั้ง/ไตรมาส ทุกไตรมาส',
+      3: '≥ 1 ครั้ง/ไตรมาส ตามเกณฑ์ขั้นต่ำ',
+      2: 'น้อยกว่า 1 ครั้ง/ไตรมาส (บางไตรมาสไม่มีกิจกรรม)',
+      1: 'ไม่มีกิจกรรมเลย หรือน้อยกว่า 2 ครั้งตลอดทั้งปี',
+    }
+  },
+  '4.3': {
+    title: 'มี New Service หรือ New Product',
+    target: '≥ 1 อย่าง/ปี + ลูกค้าซื้อ ≥ 2 ราย',
+    levels: {
+      5: '≥ 2 New Service/Product/ปี และลูกค้าซื้อ ≥ 5 ราย',
+      4: '≥ 1 New Service/Product + ลูกค้าซื้อ ≥ 2 ราย ตามเป้า',
+      3: 'มี 1 New Service/Product แต่ยังอยู่ระหว่าง Pilot หรือลูกค้าซื้อ < 2 ราย',
+      2: 'เสนอ Concept แต่ยังไม่เป็น Product จริง / ไม่มีลูกค้าซื้อ',
+      1: 'ไม่มีข้อเสนอ New Service/Product ใดเลย',
+    }
+  },
+  '4.4': {
+    title: 'พัฒนาเครื่องมือ/กระบวนการ เพื่อลด Workload & เพิ่มประสิทธิภาพ',
+    target: '≥ 1 tool/ปี',
+    levels: {
+      5: '≥ 2 tools/ปี ใช้งานจริงในทีม และวัด Workload Reduction ได้ชัดเจน',
+      4: '≥ 1 tool ที่ใช้งานจริงในทีม วัดผลประสิทธิภาพได้',
+      3: '≥ 1 tool/process ที่อยู่ระหว่างทดสอบ / ใช้งานบางส่วน',
+      2: 'มีแผนหรือ Prototype แต่ยังไม่ได้ใช้งานจริง',
+      1: 'ไม่มี tool หรือ process ใหม่ใดเลยในรอบปี',
+    }
+  },
+  '4.5': {
+    title: 'เสนอปัญหาที่สามารถพัฒนาเป็น Innovation ได้',
+    target: '≥ 1 ครั้ง/ปี',
+    levels: {
+      5: '≥ 3 ข้อเสนอ/ปี และอย่างน้อย 1 ข้อถูกนำไปพัฒนาต่อจริง',
+      4: '≥ 2 ข้อเสนอ/ปี พร้อม Feasibility Analysis',
+      3: '≥ 1 ข้อเสนอ/ปี ตามเกณฑ์ขั้นต่ำ',
+      2: 'มีข้อเสนอ แต่ยังไม่ชัดเจน ขาด Analysis หรือ Feasibility',
+      1: 'ไม่มีข้อเสนอใดเลยในรอบปี',
+    }
+  },
+};
+
+const MEMBERS = ['Pongwit','Ratthawit','Panupat','Natthapas','Nathapong','Namo'];
+const AVATAR_COLORS = ['#0078d4','#107c10','#8764b8','#ca5010','#e3008c','#005a9e'];
+
+// Default scores from Excel
+const DEFAULT_SCORES = {
+  Pongwit:   { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  Ratthawit: { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':5,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  Panupat:   { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  Natthapas: { '1.1':null,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  Nathapong: { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+  Namo:      { '1.1':5,'1.2':5,'1.3':5,'1.4':5,'1.5':4,'1.6':5,'1.7':5, '2.1':5,'2.2':5,'2.3':5,'2.4':5,'2.5':5,'2.6':5,'2.7':5,'2.8':5, '3.1':3,'3.2':3,'3.3':2,'3.4':4,'3.5':5, '4.1':4,'4.2':5,'4.3':4,'4.4':3,'4.5':3 },
+};
+
+// Load from localStorage or use defaults
+let scores = {};
+function loadScores() {
+  try {
+    const saved = localStorage.getItem('kpi2026_scores');
+    if (saved) {
+      scores = JSON.parse(saved);
+    } else {
+      scores = JSON.parse(JSON.stringify(DEFAULT_SCORES));
+    }
+  } catch(e) {
+    scores = JSON.parse(JSON.stringify(DEFAULT_SCORES));
+  }
+}
+
+function saveAll() {
+  localStorage.setItem('kpi2026_scores', JSON.stringify(scores));
+  localStorage.setItem('kpi2026_disabled', JSON.stringify(disabled));
+  localStorage.setItem('kpi2026_weights', JSON.stringify(customWeights));
+  localStorage.setItem('kpi2026_customKPIs', JSON.stringify(customKPIs));
+  try {
+    localStorage.setItem('kpi2026_evidence', JSON.stringify(evidence));
+  } catch(e) {
+    showToast('⚠️ รูปภาพมีขนาดใหญ่เกิน — บันทึกได้เฉพาะคะแนน');
+  }
+  // Record history snapshot for each member
+  MEMBERS.forEach(name => recordHistory(name));
+  const ts = new Date().toLocaleString('th-TH');
+  localStorage.setItem('kpi2026_saved', ts);
+  document.querySelectorAll('.last-saved').forEach(el => el.textContent = 'บันทึกเมื่อ: ' + ts);
+  showToast('บันทึกข้อมูลเรียบร้อยแล้ว ✓');
+  // Push shared copy to the cloud (no-op if cloud not configured)
+  cloudPush();
+}
+
+// ============================================================
+// EVIDENCE
+// ============================================================
+let evidence = {};
+
+function loadEvidence() {
+  try {
+    const saved = localStorage.getItem('kpi2026_evidence');
+    if (saved) evidence = JSON.parse(saved);
+  } catch(e) { evidence = {}; }
+}
+
+function getEvidence(member, no) {
+  if (!evidence[member]) evidence[member] = {};
+  if (!evidence[member][no]) evidence[member][no] = { note: '', images: [] };
+  return evidence[member][no];
+}
+
+function toggleEvidence(name, no) {
+  const key = no.replace(/\./g,'_');
+  const row = document.getElementById(`evrow_${name}_${key}`);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  row.style.display = isOpen ? 'none' : 'table-row';
+  if (!isOpen) renderEvidenceImages(name, no);
+}
+
+function updateEvidenceNote(name, no, val) {
+  getEvidence(name, no).note = val;
+  updateEvidenceToggle(name, no);
+}
+
+function updateEvidenceToggle(name, no) {
+  const key = no.replace(/\./g,'_');
+  const btn = document.getElementById(`evbtn_${name}_${key}`);
+  if (!btn) return;
+  const ev = getEvidence(name, no);
+  const count = ev.images.length + (ev.note.trim() ? 1 : 0);
+  btn.textContent = count > 0 ? `📎 หลักฐาน (${count})` : '📎 เพิ่มหลักฐาน';
+  btn.className = 'ev-toggle-btn' + (count > 0 ? ' has-ev' : '');
+}
+
+function addEvidenceImages(name, no, input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const ev = getEvidence(name, no);
+  let pending = files.length;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 900;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        ev.images.push({ name: file.name, data: canvas.toDataURL('image/jpeg', 0.78) });
+        pending--;
+        if (pending === 0) { renderEvidenceImages(name, no); updateEvidenceToggle(name, no); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function removeEvidenceImage(name, no, idx) {
+  getEvidence(name, no).images.splice(idx, 1);
+  renderEvidenceImages(name, no);
+  updateEvidenceToggle(name, no);
+}
+
+function renderEvidenceImages(name, no) {
+  const key = no.replace(/\./g,'_');
+  const gallery = document.getElementById(`evgallery_${name}_${key}`);
+  if (!gallery) return;
+  const ev = getEvidence(name, no);
+  gallery.innerHTML = ev.images.map((img, i) => `
+    <div class="ev-img-thumb" onclick="openLightbox('${name}','${no}',${i})">
+      <img src="${img.data}" alt="${img.name}">
+      <span class="ev-img-name">${img.name}</span>
+      <button class="ev-remove" onclick="event.stopPropagation();removeEvidenceImage('${name}','${no}',${i})">✕</button>
+    </div>`).join('') + `
+    <label class="ev-add-img-btn" title="เพิ่มรูปภาพ Cert/เอกสาร">
+      <input type="file" accept="image/*" multiple style="display:none"
+        onchange="addEvidenceImages('${name}','${no}',this)">
+      <span class="add-icon">📷</span><span>เพิ่มรูป</span>
+    </label>`;
+}
+
+function openLightbox(name, no, idx) {
+  const ev = getEvidence(name, no);
+  if (!ev.images[idx]) return;
+  const lb = document.getElementById('lightbox');
+  lb.querySelector('img').src = ev.images[idx].data;
+  document.getElementById('lightboxName').textContent = ev.images[idx].name;
+  lb.classList.add('open');
+}
+
+// ============================================================
+// MEASUREMENT CUSTOM ITEMS
+// ============================================================
+function renderCustomItems(name, no) {
+  const key = no.replace(/\./g,'_');
+  const container = document.getElementById(`measlist_${name}_${key}`);
+  if (!container) return;
+  const ev = getEvidence(name, no);
+  const items = ev.customItems || [];
+  container.innerHTML = items.map((citem, ci) => `
+    <div class="meas-item-row">
+      <span class="meas-bullet">•</span>
+      <input class="meas-item-input" value="${citem.replace(/"/g,'&quot;')}"
+        oninput="updateCustomItem('${name}','${no}',${ci},this.value)"
+        placeholder="ระบุ...">
+      <button class="meas-item-del" onclick="removeCustomItem('${name}','${no}',${ci})">✕</button>
+    </div>`).join('');
+}
+
+function addCustomItem(name, no) {
+  const ev = getEvidence(name, no);
+  if (!ev.customItems) ev.customItems = [];
+  ev.customItems.push('');
+  renderCustomItems(name, no);
+  setTimeout(() => {
+    const key = no.replace(/\./g,'_');
+    const list = document.getElementById(`measlist_${name}_${key}`);
+    if (list) {
+      const inputs = list.querySelectorAll('.meas-item-input');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+    }
+  }, 30);
+}
+
+function updateCustomItem(name, no, idx, val) {
+  const ev = getEvidence(name, no);
+  if (ev.customItems && ev.customItems[idx] !== undefined) ev.customItems[idx] = val;
+}
+
+function removeCustomItem(name, no, idx) {
+  const ev = getEvidence(name, no);
+  if (ev.customItems) { ev.customItems.splice(idx, 1); renderCustomItems(name, no); }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#107c10;color:white;padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:fadeIn 0.3s';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2500);
+}
+
+// ============================================================
+// SCORING
+// ============================================================
+function calcSection(member, sectionIdx) {
+  const sec = KPI_SECTIONS[sectionIdx];
+  let total = 0, maxTotal = 0;
+  for (const item of sec.items) {
+    if (isDisabled(member, item.no)) continue;
+    const w = getItemWeight(member, item.no);
+    const s = scores[member]?.[item.no] ?? null;
+    if (s !== null && s !== undefined) total += w * s;
+    maxTotal += w * 5;
+  }
+  // Include custom KPIs for this section
+  for (const citem of (customKPIs[sec.id] || [])) {
+    if (isDisabled(member, citem.id)) continue;
+    const w = citem.weight || 0;
+    const s = scores[member]?.[citem.id] ?? null;
+    if (s !== null && s !== undefined) total += w * s;
+    maxTotal += w * 5;
+  }
+  return maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+}
+
+function getActiveWeightSum(member, sectionIdx) {
+  const sec = KPI_SECTIONS[sectionIdx];
+  const std = sec.items.reduce((sum, item) =>
+    isDisabled(member, item.no) ? sum : sum + getItemWeight(member, item.no), 0);
+  const cust = (customKPIs[sec.id] || []).reduce((sum, citem) =>
+    isDisabled(member, citem.id) ? sum : sum + (citem.weight || 0), 0);
+  return std + cust;
+}
+
+function calcTotal(member) {
+  let sum = 0;
+  for (let i = 0; i < KPI_SECTIONS.length; i++) {
+    sum += calcSection(member, i);
+  }
+  return sum / KPI_SECTIONS.length;
+}
+
+function getGrade(pct) {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B+';
+  if (pct >= 60) return 'B';
+  if (pct >= 50) return 'C';
+  return 'D';
+}
+
+function gradeClass(grade) {
+  return { 'A+':'grade-ap','A':'grade-a','B+':'grade-bp','B':'grade-b','C':'grade-c','D':'grade-d' }[grade] || 'grade-d';
+}
+
+function gradeLabel(grade) {
+  return { 'A+':'สูงกว่าเป้าหมายอย่างมาก','A':'เป็นไปตามเป้าหมาย','B+':'พัฒนาบางส่วน','B':'ต้องพัฒนา/ปรับปรุง','C':'ต้องเรียนรู้เพิ่ม','D':'ต้องพิจารณาความเหมาะสม' }[grade] || '';
+}
+
+function barColor(pct) {
+  if (pct >= 90) return '#107c10';
+  if (pct >= 80) return '#0078d4';
+  if (pct >= 70) return '#8764b8';
+  if (pct >= 60) return '#ca5010';
+  if (pct >= 50) return '#e3008c';
+  return '#d13438';
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+let radarChart = null;
+
+function renderDashboard() {
+  const container = document.getElementById('dashboardCards');
+  container.innerHTML = '';
+
+  MEMBERS.forEach((name, idx) => {
+    const total = calcTotal(name);
+    const grade = getGrade(total);
+    const gClass = gradeClass(grade);
+    const initials = name.slice(0,2).toUpperCase();
+
+    const card = document.createElement('div');
+    card.className = 'member-card';
+    card.onclick = () => showPage('person_' + name);
+
+    const sectionBars = KPI_SECTIONS.map((sec, si) => {
+      const pct = calcSection(name, si);
+      return `<div class="section-bar">
+        <span class="label">${si+1}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor(pct)}"></div></div>
+        <span class="pct">${pct.toFixed(0)}%</span>
+      </div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="avatar" style="background:${AVATAR_COLORS[idx]}">${initials}</div>
+      <h3>${name}</h3>
+      <div class="total-score" style="color:${AVATAR_COLORS[idx]}">${total.toFixed(1)}%</div>
+      <span class="grade-badge ${gClass}">${grade} · ${gradeLabel(grade)}</span>
+      <div class="section-bars">${sectionBars}</div>
+    `;
+    container.appendChild(card);
+  });
+
+  renderFunnel();
+  renderTeamRadar();
+}
+
+function renderFunnel() {
+  const el = document.getElementById('funnelChart');
+  if (!el) return;
+
+  // Build sorted member data
+  const data = MEMBERS.map((name, idx) => {
+    const total = calcTotal(name);
+    const grade = getGrade(total);
+    return { name, total, grade, color: AVATAR_COLORS[idx] };
+  }).sort((a, b) => b.total - a.total);
+
+  const maxPct = Math.max(...data.map(d => d.total), 1);
+  // Funnel goes from widest (rank 1) to narrowest (last)
+  // We'll draw as SVG trapezoids stacked vertically
+
+  const W = 560;        // total SVG width
+  const sliceH = 54;    // height per slice
+  const labelW = 130;   // left label column
+  const rightW = 90;    // right value column
+  const funnelW = W - labelW - rightW; // usable funnel width
+  const maxBar = funnelW * 0.96;
+  const minBar = funnelW * 0.18;
+  const svgH = data.length * sliceH + 20;
+
+  // Grade colours matching app palette
+  const gradeCol = { 'A+':'#107c10','A':'#1e8bc3','B+':'#6b2fa0','B':'#0078d4','C':'#ca5010','D':'#a4262c' };
+
+  const slices = data.map((d, i) => {
+    const ratio = maxPct > 0 ? d.total / maxPct : 0;
+    const barW = minBar + (maxBar - minBar) * ratio;
+    const x0 = labelW + (funnelW - barW) / 2;
+    const y0 = i * sliceH + 10;
+
+    // Trapezoid: top edge wider, bottom edge a touch narrower to create 3-D feel
+    const taper = i === data.length - 1 ? 0 : 8;
+    const x1 = x0, y1 = y0;
+    const x2 = x0 + barW, y2 = y0;
+    const x3 = x0 + barW - taper / 2, y3 = y0 + sliceH - 2;
+    const x4 = x0 + taper / 2, y4 = y0 + sliceH - 2;
+
+    // Gradient stops: lighter top, richer bottom
+    const gc = d.color;
+    const gradId = `fg${i}`;
+
+    const percentFill = d.total > 0 ? d.total.toFixed(1) + '%' : '—';
+    const gradeColor = gradeCol[d.grade] || '#666';
+    const rank = i + 1;
+
+    return `
+      <defs>
+        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${gc}" stop-opacity="0.75"/>
+          <stop offset="100%" stop-color="${gc}" stop-opacity="1"/>
+        </linearGradient>
+      </defs>
+      <!-- trapezoid -->
+      <polygon points="${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}"
+        fill="url(#${gradId})" rx="4"/>
+      <!-- top shine -->
+      <polygon points="${x1+2},${y1+2} ${x2-2},${y2+2} ${x2-2},${y2+8} ${x1+2},${y1+8}"
+        fill="white" opacity="0.12"/>
+
+      <!-- rank badge inside funnel -->
+      <circle cx="${x0 + 22}" cy="${y0 + sliceH/2}" r="12" fill="white" opacity="0.25"/>
+      <text x="${x0 + 22}" y="${y0 + sliceH/2 + 4.5}" text-anchor="middle"
+        font-size="12" font-weight="800" fill="white">#${rank}</text>
+
+      <!-- name inside funnel -->
+      <text x="${x0 + barW/2 + 10}" y="${y0 + sliceH/2 + 5}" text-anchor="middle"
+        font-size="13" font-weight="700" fill="white" style="text-shadow:0 1px 3px rgba(0,0,0,.4)">
+        ${d.name}
+      </text>
+
+      <!-- left label: grade -->
+      <rect x="4" y="${y0 + sliceH/2 - 12}" width="38" height="22" rx="5"
+        fill="${gradeColor}" opacity="0.9"/>
+      <text x="23" y="${y0 + sliceH/2 + 4}" text-anchor="middle"
+        font-size="12" font-weight="800" fill="white">${d.grade}</text>
+
+      <!-- right: percentage -->
+      <text x="${W - rightW + 8}" y="${y0 + sliceH/2 - 3}" font-size="16" font-weight="800"
+        fill="${gc}">${percentFill}</text>
+      <text x="${W - rightW + 8}" y="${y0 + sliceH/2 + 13}" font-size="10"
+        fill="#888">คะแนนรวม</text>
+    `;
+  }).join('');
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${svgH}" xmlns="http://www.w3.org/2000/svg"
+      style="width:100%;max-width:640px;display:block;margin:0 auto;overflow:visible">
+      ${slices}
+    </svg>
+    <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:6px">
+      เรียงจากคะแนนสูงสุด → ต่ำสุด · กว้าง = คะแนนมาก
+    </div>`;
+}
+
+function renderTeamRadar() {
+  const ctx = document.getElementById('teamRadarChart').getContext('2d');
+  if (radarChart) radarChart.destroy();
+
+  const labels = KPI_SECTIONS.map(s => s.name);
+  const datasets = MEMBERS.map((name, idx) => ({
+    label: name,
+    data: KPI_SECTIONS.map((_, si) => calcSection(name, si).toFixed(1)),
+    backgroundColor: AVATAR_COLORS[idx] + '22',
+    borderColor: AVATAR_COLORS[idx],
+    borderWidth: 2,
+    pointBackgroundColor: AVATAR_COLORS[idx],
+    pointRadius: 4,
+  }));
+
+  radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { r: { min: 0, max: 100, ticks: { stepSize: 20, font: { size: 11 } } } },
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16 } } }
+    }
+  });
+}
+
+// ============================================================
+// COMPARE PAGE
+// ============================================================
+let compareChart = null;
+
+function renderCompare() {
+  // Rank table
+  const tbody = [];
+  const memberData = MEMBERS.map(name => {
+    const total = calcTotal(name);
+    const sections = KPI_SECTIONS.map((_, si) => calcSection(name, si));
+    return { name, total, sections, grade: getGrade(total) };
+  }).sort((a,b) => b.total - a.total);
+
+  const thead = `<thead><tr>
+    <th>Rank</th><th>ชื่อ</th>
+    ${KPI_SECTIONS.map(s=>`<th>${s.name}</th>`).join('')}
+    <th>รวม</th><th>Grade</th>
+  </tr></thead>`;
+
+  const rows = memberData.map((d, i) => {
+    const rankClass = ['rank-1','rank-2','rank-3'][i] || 'rank-other';
+    return `<tr>
+      <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+      <td style="font-weight:700">${d.name}</td>
+      ${d.sections.map(s=>`<td>${s.toFixed(1)}%</td>`).join('')}
+      <td style="font-weight:800;color:${barColor(d.total)}">${d.total.toFixed(1)}%</td>
+      <td><span class="grade-badge ${gradeClass(d.grade)}">${d.grade}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('compareTable').innerHTML = thead + '<tbody>' + rows + '</tbody>';
+
+  // Bar chart
+  const ctx = document.getElementById('compareBarChart').getContext('2d');
+  if (compareChart) compareChart.destroy();
+
+  compareChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: MEMBERS,
+      datasets: KPI_SECTIONS.map((sec, si) => ({
+        label: sec.name,
+        data: MEMBERS.map(name => calcSection(name, si).toFixed(1)),
+        backgroundColor: ['#0078d4','#107c10','#8764b8','#ca5010'][si] + 'cc',
+        borderColor: ['#0078d4','#107c10','#8764b8','#ca5010'][si],
+        borderWidth: 1, borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: false }, y: { min:0, max:100, ticks: { callback: v => v+'%' } } },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+}
+
+// ============================================================
+// PERSON PAGE
+// ============================================================
+function buildPersonPages() {
+  const container = document.getElementById('personPagesContainer');
+  container.innerHTML = '';
+
+  MEMBERS.forEach((name, idx) => {
+    const div = document.createElement('div');
+    div.id = 'page-person_' + name;
+    div.className = 'page';
+
+    div.innerHTML = `
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="updatePersonView('${name}')">🔄 คำนวณใหม่</button>
+        <button class="btn btn-success" onclick="saveAll()">💾 บันทึก</button>
+        <button class="btn btn-secondary admin-only" onclick="showHistoryModal('${name}')">📋 ประวัติ</button>
+        <button class="btn btn-export admin-only" onclick="exportReport('${name}')">📄 Export Report</button>
+        <span class="last-saved">${localStorage.getItem('kpi2026_saved') ? 'บันทึกเมื่อ: '+localStorage.getItem('kpi2026_saved') : ''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
+        <!-- LEFT: KRA Funnel -->
+        <div class="card" style="position:sticky;top:80px;padding:14px 10px">
+          <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-align:center;letter-spacing:.5px">
+            🔽 KRA Performance
+          </div>
+          <div id="personfunnel_${name}"></div>
+        </div>
+        <!-- RIGHT: score panel + sections -->
+        <div>
+          <div id="scorepanel_${name}" class="score-panel"></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px"
+              onclick="openAllSections('${name}')">▼ ขยายทั้งหมด</button>
+          </div>
+          ${KPI_SECTIONS.map((sec, si) => buildSectionTable(name, sec, si)).join('')}
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+
+    updatePersonView(name);
+  });
+}
+
+function buildSectionTable(name, sec, si) {
+  const items = sec.items.map((item, ii) => {
+    const s = scores[name]?.[item.no] ?? null;
+    const radioName = `score_${name}_${item.no.replace(/\./g,'_')}`;
+    const checkboxes = [1,2,3,4,5].map(v => {
+      const checked = (s === v) ? 'checked' : '';
+      return `<label class="score-label-wrap">
+        <input type="radio" class="score-cb" name="${radioName}" value="${v}" ${checked}
+          onchange="onScoreChange('${name}','${item.no}',this)">
+        <span class="score-label scb-s${v}">
+          <span class="cb-check">✓</span>
+          <span class="cb-num">${v}</span>
+        </span>
+      </label>`;
+    }).join('');
+    const clearBtn = `<button class="score-clear-btn" onclick="clearScore('${name}','${item.no}')" title="ล้างคะแนน">✕</button>`;
+    const rubricBtn = `<button class="rubric-btn" title="ดูเกณฑ์การให้คะแนน"
+      onmouseenter="showRubric('${item.no}',this)" onmouseleave="hideRubric(300)"
+      onclick="showRubric('${item.no}',this)">ℹ</button>`;
+    const key = item.no.replace(/\./g,'_');
+    const ev = getEvidence(name, item.no);
+    const evCount = ev.images.length + (ev.note.trim() ? 1 : 0);
+    const evBtnClass = 'ev-toggle-btn' + (evCount > 0 ? ' has-ev' : '');
+    const evBtnLabel = evCount > 0 ? `📎 หลักฐาน (${evCount})` : '📎 เพิ่มหลักฐาน';
+    const naDisabled = isDisabled(name, item.no);
+    return `<tr id="kpirow_${name}_${key}" class="${naDisabled?'kpi-row-disabled':''}">
+      <td class="no-col" style="vertical-align:top">
+        ${item.no}
+        <button id="nabtn_${name}_${key}" class="na-btn admin-only${naDisabled?' na-on':''}"
+          onclick="toggleDisabled('${name}','${item.no}')"
+          title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
+          ${naDisabled?'N/A':'✓'}
+        </button>
+      </td>
+      <td class="kpi-text">
+        ${item.kpi}
+        <br>
+        <button id="evbtn_${name}_${key}" class="${evBtnClass}"
+          onclick="toggleEvidence('${name}','${item.no}')">${evBtnLabel}</button>
+      </td>
+      <td style="font-size:12px;min-width:180px">
+        <div style="color:var(--text-muted)">${item.measurement}</div>
+        <div class="meas-custom-list" id="measlist_${name}_${key}">${(()=>{
+          const ev2 = getEvidence(name, item.no);
+          return (ev2.customItems||[]).map((ci,i)=>`<div class="meas-item-row"><span class="meas-bullet">•</span><input class="meas-item-input" value="${ci.replace(/"/g,'&quot;')}" oninput="updateCustomItem('${name}','${item.no}',${i},this.value)" placeholder="ระบุ..."><button class="meas-item-del" onclick="removeCustomItem('${name}','${item.no}',${i})">✕</button></div>`).join('');
+        })()}</div>
+        <button class="meas-add-btn" onclick="addCustomItem('${name}','${item.no}')">＋ เพิ่ม</button>
+      </td>
+      <td><span class="freq-badge">${item.freq}</span></td>
+      <td class="weight-cell" style="white-space:nowrap">
+        <span id="wval_${name}_${key}">${(getItemWeight(name,item.no)*100).toFixed(0)}%</span>
+        <button id="wadd_${name}_${key}" class="weight-add-btn" style="display:none"
+          onclick="addWeightStep('${name}','${item.no}')" title="+1% Weight">＋</button>
+        <button id="wrem_${name}_${key}" class="weight-rem-btn" style="display:none"
+          onclick="removeWeightStep('${name}','${item.no}')" title="-1% Weight">－</button>
+      </td>
+      <td style="text-align:left; min-width:200px">
+        <div class="score-group">${checkboxes}${clearBtn}${rubricBtn}</div>
+        <div class="score-reason" id="reason_${name}_${key}" style="display:${s===5?'block':'none'}">
+          <div class="score-reason-label">⭐ เหตุผลที่ให้คะแนนสูงสุด</div>
+          <textarea class="score-reason-input"
+            placeholder="ระบุเหตุผลที่ให้ 5 คะแนน เช่น ผลงานเกินเป้า, ทำครบทุกข้อ..."
+            oninput="updateScoreReason('${name}','${item.no}',this.value)">${ev.scoreReason||''}</textarea>
+        </div>
+      </td>
+      <td class="total-cell" id="total_${name}_${key}">
+        ${s ? (item.weight * s).toFixed(2) : '—'}
+      </td>
+    </tr>
+    <tr id="evrow_${name}_${key}" class="evidence-row" style="display:none">
+      <td colspan="7">
+        <div class="evidence-panel">
+          <div>
+            <div class="ev-section-label">📝 บันทึก / หมายเหตุ</div>
+            <textarea class="ev-notes-area"
+              placeholder="ระบุรายละเอียดหลักฐาน เช่น วันที่สอบ ผลคะแนน ลิงก์อ้างอิง..."
+              oninput="updateEvidenceNote('${name}','${item.no}',this.value)">${ev.note || ''}</textarea>
+          </div>
+          <div>
+            <div class="ev-section-label">📷 รูปภาพ / เอกสารหลักฐาน (Cert, Screenshot)</div>
+            <div class="ev-img-gallery" id="evgallery_${name}_${key}">
+              <label class="ev-add-img-btn" title="เพิ่มรูปภาพ Cert/เอกสาร">
+                <input type="file" accept="image/*" multiple style="display:none"
+                  onchange="addEvidenceImages('${name}','${item.no}',this)">
+                <span class="add-icon">📷</span><span>เพิ่มรูป</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const secId = `secsBody_${name}_s${si+1}`;
+  const headId = `secsHead_${name}_s${si+1}`;
+  const chevId = `secsChev_${name}_s${si+1}`;
+  return `<div class="kpi-section">
+    <div class="kpi-section-header" id="${headId}" onclick="toggleSection('${name}',${si})">
+      <span><span class="sec-chevron" id="${chevId}">▶</span>${sec.no}. ${sec.name} <span style="font-weight:400;opacity:.8">· ${sec.nameTh}</span></span>
+      <div style="display:flex;align-items:center;gap:8px" onclick="event.stopPropagation()">
+        <button id="secSaveBtn_${name}_s${si+1}" class="sec-save-btn admin-only"
+          onclick="saveSectionSettings('${name}',${si})">💾 บันทึกการตั้งค่า</button>
+        <button class="sec-reset-btn admin-only"
+          onclick="resetSectionToDefault('${name}',${si})">↺ คืนค่า Default</button>
+        <span id="weightstat_${name}_s${si+1}" style="margin-left:4px"></span>
+        <span class="kpi-section-total" id="sectotal_${name}_s${si+1}">—%</span>
+      </div>
+    </div>
+    <div class="kpi-section-body" id="${secId}">
+      <table class="kpi-table">
+        <thead><tr>
+          <th>No.</th><th>KPI</th><th>Measurement</th><th>Frequency</th>
+          <th>Weight</th><th style="text-align:center">Score (1–5)</th><th style="text-align:center">Total</th>
+        </tr></thead>
+        <tbody id="secstbody_${name}_s${si+1}">${items}${buildCustomKPIRows(name, sec, si)}</tbody>
+      </table>
+      <div style="padding:6px 12px 10px">
+        <button class="add-kpi-btn admin-only" onclick="addCustomKPI('${sec.id}','${name}')">
+          ＋ เพิ่ม KPI ใน ${sec.name}
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// CUSTOM KPI CRUD
+// ============================================================
+function buildCustomKPIRows(name, sec, si) {
+  const cItems = customKPIs[sec.id] || [];
+  return cItems.map((citem, ci) => {
+    const s = scores[name]?.[citem.id] ?? null;
+    const radioName = `score_${name}_${citem.id}`;
+    const checkboxes = [1,2,3,4,5].map(v => {
+      const checked = (s === v) ? 'checked' : '';
+      return `<label class="score-label-wrap">
+        <input type="radio" class="score-cb" name="${radioName}" value="${v}" ${checked}
+          onchange="onScoreChange('${name}','${citem.id}',this)">
+        <span class="score-label scb-s${v}">
+          <span class="cb-check">✓</span>
+          <span class="cb-num">${v}</span>
+        </span>
+      </label>`;
+    }).join('');
+    const clearBtn = `<button class="score-clear-btn" onclick="clearScore('${name}','${citem.id}')" title="ล้างคะแนน">✕</button>`;
+    const naDisabled = isDisabled(name, citem.id);
+    const escKpi  = (citem.kpi  || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const escMeas = (citem.measurement || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const escFreq = (citem.freq || 'Yearly').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const wPct    = Math.round((citem.weight || 0.1) * 100);
+    const totalVal = s ? ((citem.weight || 0.1) * s).toFixed(2) : '—';
+    return `<tr id="kpirow_${name}_${citem.id}" class="kpi-custom-row${naDisabled?' kpi-row-disabled':''}">
+      <td class="no-col" style="vertical-align:top;padding-top:12px">
+        <div style="font-weight:800;color:#8764b8;font-size:12px">${sec.no}.C${ci+1}</div>
+        <button id="nabtn_${name}_${citem.id}" class="na-btn admin-only${naDisabled?' na-on':''}"
+          onclick="toggleDisabled('${name}','${citem.id}')"
+          title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
+          ${naDisabled?'N/A':'✓'}
+        </button>
+        <button class="kpi-custom-del-btn admin-only" onclick="removeCustomKPI('${sec.id}','${citem.id}')" title="ลบ KPI นี้">🗑</button>
+      </td>
+      <td class="kpi-text">
+        <input class="kpi-field-input" value="${escKpi}" placeholder="ระบุ KPI ที่ต้องการวัด..."
+          oninput="updateCustomKPIField('${sec.id}','${citem.id}','kpi',this.value)">
+      </td>
+      <td style="font-size:12px;min-width:180px">
+        <input class="kpi-field-input" value="${escMeas}" placeholder="เกณฑ์การวัด เช่น ≥ 90%"
+          oninput="updateCustomKPIField('${sec.id}','${citem.id}','measurement',this.value)">
+      </td>
+      <td>
+        <input class="kpi-field-input" style="width:88px" value="${escFreq}" placeholder="Frequency"
+          oninput="updateCustomKPIField('${sec.id}','${citem.id}','freq',this.value)">
+      </td>
+      <td class="weight-cell" style="white-space:nowrap">
+        <input type="number" class="kpi-field-input" id="cwval_${name}_${citem.id}"
+          style="width:44px;text-align:center;font-weight:800;color:#8764b8"
+          value="${wPct}" min="1" max="100" step="1"
+          onchange="updateCustomKPIWeight('${sec.id}','${citem.id}',this.value)">%
+      </td>
+      <td style="text-align:left;min-width:200px">
+        <div class="score-group">${checkboxes}${clearBtn}</div>
+      </td>
+      <td class="total-cell" id="total_${name}_${citem.id}">${totalVal}</td>
+    </tr>`;
+  }).join('');
+}
+
+function addCustomKPI(secId) {
+  if (!customKPIs[secId]) customKPIs[secId] = [];
+  const id = 'ck_' + Date.now();
+  customKPIs[secId].push({ id, kpi: '', measurement: '', freq: 'Yearly', weight: 0.1 });
+  MEMBERS.forEach(name => {
+    if (!scores[name]) scores[name] = {};
+    scores[name][id] = null;
+  });
+  const si = KPI_SECTIONS.findIndex(s => s.id === secId);
+  if (si >= 0) rebuildSectionTbodyForAllMembers(si);
+  saveCustomKPIs();
+  // Focus the new input after a tick
+  setTimeout(() => {
+    const allNew = document.querySelectorAll('.kpi-field-input');
+    if (allNew.length) allNew[allNew.length - 1].focus();
+  }, 80);
+}
+
+function removeCustomKPI(secId, kpiId) {
+  if (!confirm('ลบ KPI นี้ออกจากทุกคนในทีม?')) return;
+  if (customKPIs[secId]) {
+    customKPIs[secId] = customKPIs[secId].filter(c => c.id !== kpiId);
+  }
+  MEMBERS.forEach(name => {
+    if (scores[name])   delete scores[name][kpiId];
+    if (disabled[name]) delete disabled[name][kpiId];
+  });
+  const si = KPI_SECTIONS.findIndex(s => s.id === secId);
+  if (si >= 0) rebuildSectionTbodyForAllMembers(si);
+  saveCustomKPIs();
+}
+
+function updateCustomKPIField(secId, kpiId, field, value) {
+  const citem = (customKPIs[secId] || []).find(c => c.id === kpiId);
+  if (citem) citem[field] = value;
+  // No rebuild needed for text-only fields
+}
+
+function updateCustomKPIWeight(secId, kpiId, pctValue) {
+  const citem = (customKPIs[secId] || []).find(c => c.id === kpiId);
+  if (!citem) return;
+  const newW = Math.max(0.01, Math.min(1.0, parseFloat(pctValue) / 100 || 0.1));
+  citem.weight = Math.round(newW * 1000) / 1000;
+  // Update total cells + scores panel for all members
+  MEMBERS.forEach(name => {
+    const totalCell = document.getElementById(`total_${name}_${kpiId}`);
+    if (totalCell) {
+      const s = scores[name]?.[kpiId] ?? null;
+      totalCell.textContent = s ? (citem.weight * s).toFixed(2) : '—';
+    }
+    updatePersonView(name);
+  });
+  renderDashboard();
+}
+
+function rebuildSectionTbodyForAllMembers(si) {
+  const sec = KPI_SECTIONS[si];
+  MEMBERS.forEach(name => {
+    const tbody = document.getElementById(`secstbody_${name}_s${si+1}`);
+    if (!tbody) return;
+    // Rebuild standard rows
+    const stdRows = sec.items.map((item, ii) => {
+      const s = scores[name]?.[item.no] ?? null;
+      const radioName = `score_${name}_${item.no.replace(/\./g,'_')}`;
+      const checkboxes = [1,2,3,4,5].map(v => {
+        const checked = (s === v) ? 'checked' : '';
+        return `<label class="score-label-wrap">
+          <input type="radio" class="score-cb" name="${radioName}" value="${v}" ${checked}
+            onchange="onScoreChange('${name}','${item.no}',this)">
+          <span class="score-label scb-s${v}">
+            <span class="cb-check">✓</span>
+            <span class="cb-num">${v}</span>
+          </span>
+        </label>`;
+      }).join('');
+      const clearBtn = `<button class="score-clear-btn" onclick="clearScore('${name}','${item.no}')" title="ล้างคะแนน">✕</button>`;
+      const rubricBtn = `<button class="rubric-btn" title="ดูเกณฑ์การให้คะแนน"
+        onmouseenter="showRubric('${item.no}',this)" onmouseleave="hideRubric(300)"
+        onclick="showRubric('${item.no}',this)">ℹ</button>`;
+      const key = item.no.replace(/\./g,'_');
+      const ev = getEvidence(name, item.no);
+      const evCount = ev.images.length + (ev.note.trim() ? 1 : 0);
+      const naDisabled = isDisabled(name, item.no);
+      const w = getItemWeight(name, item.no);
+      return `<tr id="kpirow_${name}_${key}" class="${naDisabled?'kpi-row-disabled':''}">
+        <td class="no-col" style="vertical-align:top">
+          ${item.no}
+          <button id="nabtn_${name}_${key}" class="na-btn${naDisabled?' na-on':''}"
+            onclick="toggleDisabled('${name}','${item.no}')"
+            title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
+            ${naDisabled?'N/A':'✓'}
+          </button>
+        </td>
+        <td class="kpi-text">
+          ${item.kpi}
+          <br>
+          <button id="evbtn_${name}_${key}" class="ev-toggle-btn${evCount>0?' has-ev':''}"
+            onclick="toggleEvidence('${name}','${item.no}')">${evCount>0?`📎 หลักฐาน (${evCount})`:'📎 เพิ่มหลักฐาน'}</button>
+        </td>
+        <td style="font-size:12px;min-width:180px">
+          <div style="color:var(--text-muted)">${item.measurement}</div>
+          <div class="meas-custom-list" id="measlist_${name}_${key}">${(()=>{
+            const ev2 = getEvidence(name, item.no);
+            return (ev2.customItems||[]).map((ci2,i2)=>`<div class="meas-item-row"><span class="meas-bullet">•</span><input class="meas-item-input" value="${ci2.replace(/"/g,'&quot;')}" oninput="updateCustomItem('${name}','${item.no}',${i2},this.value)" placeholder="ระบุ..."><button class="meas-item-del" onclick="removeCustomItem('${name}','${item.no}',${i2})">✕</button></div>`).join('');
+          })()}</div>
+          <button class="meas-add-btn" onclick="addCustomItem('${name}','${item.no}')">＋ เพิ่ม</button>
+        </td>
+        <td><span class="freq-badge">${item.freq}</span></td>
+        <td class="weight-cell" style="white-space:nowrap">
+          <span id="wval_${name}_${key}" class="${Math.abs(w-item.weight)>0.001?'weight-custom':''}">${(w*100).toFixed(0)}%</span>
+          <button id="wadd_${name}_${key}" class="weight-add-btn" style="display:none"
+            onclick="addWeightStep('${name}','${item.no}')" title="+1% Weight">＋</button>
+          <button id="wrem_${name}_${key}" class="weight-rem-btn" style="display:none"
+            onclick="removeWeightStep('${name}','${item.no}')" title="-1% Weight">－</button>
+        </td>
+        <td style="text-align:left;min-width:200px">
+          <div class="score-group">${checkboxes}${clearBtn}${rubricBtn}</div>
+          <div class="score-reason" id="reason_${name}_${key}" style="display:${s===5?'block':'none'}">
+            <div class="score-reason-label">⭐ เหตุผลที่ให้คะแนนสูงสุด</div>
+            <textarea class="score-reason-input"
+              placeholder="ระบุเหตุผลที่ให้ 5 คะแนน..."
+              oninput="updateScoreReason('${name}','${item.no}',this.value)">${ev.scoreReason||''}</textarea>
+          </div>
+        </td>
+        <td class="total-cell" id="total_${name}_${key}">
+          ${s ? (w * s).toFixed(2) : '—'}
+        </td>
+      </tr>
+      <tr id="evrow_${name}_${key}" class="evidence-row" style="display:none">
+        <td colspan="7">
+          <div class="evidence-panel">
+            <div>
+              <div class="ev-section-label">📝 บันทึก / หมายเหตุ</div>
+              <textarea class="ev-notes-area"
+                placeholder="ระบุรายละเอียดหลักฐาน..."
+                oninput="updateEvidenceNote('${name}','${item.no}',this.value)">${ev.note||''}</textarea>
+            </div>
+            <div>
+              <div class="ev-section-label">📷 รูปภาพ / เอกสารหลักฐาน</div>
+              <div class="ev-img-gallery" id="evgallery_${name}_${key}">
+                <label class="ev-add-img-btn">
+                  <input type="file" accept="image/*" multiple style="display:none"
+                    onchange="addEvidenceImages('${name}','${item.no}',this)">
+                  <span class="add-icon">📷</span><span>เพิ่มรูป</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+    tbody.innerHTML = stdRows + buildCustomKPIRows(name, sec, si);
+    updatePersonView(name);
+  });
+  renderDashboard();
+}
+
+function onScoreChange(name, no, el) {
+  const val = parseInt(el.value);
+  scores[name][no] = val > 0 ? val : null;
+  const key = no.replace(/\./g,'_');
+  const totalCell = document.getElementById(`total_${name}_${key}`);
+
+  // Determine weight — standard KPI or custom KPI
+  const stdItem = KPI_SECTIONS.flatMap(s => s.items).find(i => i.no === no);
+  let weight = 0;
+  if (stdItem) {
+    weight = getItemWeight(name, no);
+  } else {
+    const citem = Object.values(customKPIs).flat().find(c => c.id === no);
+    if (citem) weight = citem.weight || 0;
+  }
+
+  if (totalCell) {
+    totalCell.textContent = val > 0 ? (weight * val).toFixed(2) : '—';
+  }
+
+  // Show/hide score-5 reason box (standard KPIs only)
+  if (stdItem) {
+    const reasonDiv = document.getElementById(`reason_${name}_${key}`);
+    if (reasonDiv) {
+      reasonDiv.style.display = val === 5 ? 'block' : 'none';
+      if (val !== 5) {
+        reasonDiv.querySelector('textarea').value = '';
+        getEvidence(name, no).scoreReason = '';
+      }
+    }
+  }
+  updatePersonView(name);
+  renderDashboard();
+}
+
+function clearScore(name, no) {
+  scores[name][no] = null;
+  const radioName = `score_${name}_${no.replace(/\./g,'_')}`;
+  document.querySelectorAll(`input[name="${radioName}"]`).forEach(r => r.checked = false);
+  const key = no.replace(/\./g,'_');
+  const totalCell = document.getElementById(`total_${name}_${key}`);
+  if (totalCell) totalCell.textContent = '—';
+  const reasonDiv = document.getElementById(`reason_${name}_${key}`);
+  if (reasonDiv) {
+    reasonDiv.style.display = 'none';
+    reasonDiv.querySelector('textarea').value = '';
+    getEvidence(name, no).scoreReason = '';
+  }
+  updatePersonView(name);
+  renderDashboard();
+}
+
+function updateScoreReason(name, no, val) {
+  getEvidence(name, no).scoreReason = val;
+}
+
+// ============================================================
+// CUSTOM KPI ITEMS (user-added per KRA section)
+// ============================================================
+let customKPIs = {};
+// Structure: { 's1': [{id:'ck_xxx', kpi:'', measurement:'', freq:'Yearly', weight:0.1}], ... }
+
+function loadCustomKPIs() {
+  try {
+    const saved = localStorage.getItem('kpi2026_customKPIs');
+    if (saved) {
+      customKPIs = JSON.parse(saved);
+      // Make sure all members have score slots for each custom KPI
+      Object.values(customKPIs).flat().forEach(citem => {
+        MEMBERS.forEach(name => {
+          if (scores[name] && scores[name][citem.id] === undefined) scores[name][citem.id] = null;
+        });
+      });
+    }
+  } catch(e) { customKPIs = {}; }
+}
+
+function saveCustomKPIs() {
+  localStorage.setItem('kpi2026_customKPIs', JSON.stringify(customKPIs));
+}
+
+// ============================================================
+// DISABLED (N/A) KPI ITEMS
+// ============================================================
+let disabled = {};
+
+function loadDisabled() {
+  try {
+    const saved = localStorage.getItem('kpi2026_disabled');
+    if (saved) disabled = JSON.parse(saved);
+  } catch(e) { disabled = {}; }
+}
+
+// ============================================================
+// CUSTOM WEIGHTS
+// ============================================================
+let customWeights = {}; // customWeights[member][no] = override weight (0.0–1.0)
+
+function loadCustomWeights() {
+  try {
+    const saved = localStorage.getItem('kpi2026_weights');
+    if (saved) customWeights = JSON.parse(saved);
+  } catch(e) { customWeights = {}; }
+}
+
+function getItemWeight(member, no) {
+  if (customWeights[member]?.[no] !== undefined) return customWeights[member][no];
+  return KPI_SECTIONS.flatMap(s => s.items).find(i => i.no === no)?.weight || 0;
+}
+
+function addWeightStep(name, no) {
+  const si = KPI_SECTIONS.findIndex(s => s.items.some(i => i.no === no));
+  if (si < 0) return;
+  if (!customWeights[name]) customWeights[name] = {};
+  customWeights[name][no] = Math.round((getItemWeight(name, no) + 0.01) * 1000) / 1000;
+  refreshWeightCells(name, si);
+  updateAllSectionWeights(name);
+  updatePersonView(name);
+  renderDashboard();
+}
+
+function removeWeightStep(name, no) {
+  const si = KPI_SECTIONS.findIndex(s => s.items.some(i => i.no === no));
+  if (si < 0) return;
+  if (!customWeights[name]) customWeights[name] = {};
+  const newVal = Math.max(0.01, Math.round((getItemWeight(name, no) - 0.01) * 1000) / 1000);
+  customWeights[name][no] = newVal;
+  refreshWeightCells(name, si);
+  updateAllSectionWeights(name);
+  updatePersonView(name);
+  renderDashboard();
+}
+
+function refreshWeightCells(name, si) {
+  const sec = KPI_SECTIONS[si];
+  const sum = getActiveWeightSum(name, si);
+  const deficit  = Math.round((1.0 - sum) * 1000) / 1000; // < 0 means surplus
+  const surplus  = Math.round((sum - 1.0) * 1000) / 1000;
+  sec.items.forEach(item => {
+    const key = item.no.replace(/\./g,'_');
+    const wval = document.getElementById(`wval_${name}_${key}`);
+    const wadd = document.getElementById(`wadd_${name}_${key}`);
+    const wrem = document.getElementById(`wrem_${name}_${key}`);
+    const wtot = document.getElementById(`total_${name}_${key}`);
+    const isNA = isDisabled(name, item.no);
+    const w = getItemWeight(name, item.no);
+    const isCustom = Math.abs(w - item.weight) > 0.001;
+    if (wval) {
+      wval.textContent = (w * 100).toFixed(0) + '%';
+      wval.className = isCustom ? 'weight-custom' : '';
+    }
+    if (wadd) wadd.style.display = (!isNA && deficit > 0.001) ? 'inline-flex' : 'none';
+    if (wrem) wrem.style.display = (!isNA && surplus > 0.001 && w > 0.01) ? 'inline-flex' : 'none';
+    if (wtot) {
+      const s = scores[name]?.[item.no] ?? null;
+      wtot.textContent = s ? (w * s).toFixed(2) : '—';
+    }
+  });
+}
+
+function isDisabled(member, no) {
+  return !!(disabled[member]?.[no]);
+}
+
+function toggleDisabled(name, no) {
+  if (!disabled[name]) disabled[name] = {};
+  const nowDisabled = !disabled[name][no];
+  disabled[name][no] = nowDisabled || undefined; // clean false values
+  if (!nowDisabled) delete disabled[name][no];
+
+  const key = no.replace(/\./g,'_');
+  // Toggle row class
+  const row = document.getElementById(`kpirow_${name}_${key}`);
+  if (row) row.classList.toggle('kpi-row-disabled', nowDisabled);
+  // Collapse evidence row if disabling
+  const evRow = document.getElementById(`evrow_${name}_${key}`);
+  if (evRow && nowDisabled) evRow.style.display = 'none';
+  // Update N/A button
+  const btn = document.getElementById(`nabtn_${name}_${key}`);
+  if (btn) {
+    btn.textContent = nowDisabled ? 'N/A' : '✓';
+    btn.className = 'na-btn' + (nowDisabled ? ' na-on' : '');
+    btn.title = nowDisabled ? 'คลิกเพื่อเปิดใช้งาน' : 'คลิกเพื่อไม่ใช้ KPI นี้';
+  }
+  updateAllSectionWeights(name);
+  updatePersonView(name);
+  renderDashboard();
+}
+
+// Track which sections are open: collapsedSections[name] = Set of si (collapsed)
+const collapsedSections = {};
+
+function toggleSection(name, si) {
+  if (!collapsedSections[name]) collapsedSections[name] = new Set();
+  const body  = document.getElementById(`secsBody_${name}_s${si+1}`);
+  const head  = document.getElementById(`secsHead_${name}_s${si+1}`);
+  const chev  = document.getElementById(`secsChev_${name}_s${si+1}`);
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  if (isOpen) {
+    body.classList.remove('open');
+    head.classList.remove('open');
+    if (chev) { chev.textContent = '▶'; chev.style.transform = ''; }
+    collapsedSections[name].add(si);
+  } else {
+    body.classList.add('open');
+    head.classList.add('open');
+    if (chev) { chev.textContent = '▼'; chev.style.transform = ''; }
+    collapsedSections[name].delete(si);
+  }
+}
+
+function openAllSections(name) {
+  KPI_SECTIONS.forEach((_, si) => {
+    const body = document.getElementById(`secsBody_${name}_s${si+1}`);
+    const head = document.getElementById(`secsHead_${name}_s${si+1}`);
+    const chev = document.getElementById(`secsChev_${name}_s${si+1}`);
+    if (body) { body.classList.add('open'); head.classList.add('open'); }
+    if (chev) chev.textContent = '▼';
+    if (collapsedSections[name]) collapsedSections[name].delete(si);
+  });
+}
+
+function saveSectionSettings(name, si) {
+  // Persist current disabled + customWeights state to localStorage
+  localStorage.setItem('kpi2026_disabled', JSON.stringify(disabled));
+  localStorage.setItem('kpi2026_weights', JSON.stringify(customWeights));
+  // Flash saved state on button
+  const btn = document.getElementById(`secSaveBtn_${name}_s${si+1}`);
+  if (btn) {
+    btn.classList.add('saved');
+    btn.textContent = '✓ บันทึกแล้ว';
+    setTimeout(() => {
+      btn.classList.remove('saved');
+      btn.textContent = '💾 บันทึกการตั้งค่า';
+    }, 2000);
+  }
+  showToast(`บันทึกการตั้งค่า Section ${si+1} เรียบร้อย ✓`);
+}
+
+function resetSectionToDefault(name, si) {
+  if (!confirm(`คืนค่า Default ทุก KPI ใน Section ${si+1} สำหรับ ${name}?\n(น้ำหนักและสถานะ N/A จะถูกรีเซ็ต)`)) return;
+  const sec = KPI_SECTIONS[si];
+  sec.items.forEach(item => {
+    // Remove custom weight
+    if (customWeights[name]) delete customWeights[name][item.no];
+    // Re-enable disabled items
+    if (disabled[name]) delete disabled[name][item.no];
+    // Update row appearance
+    const key = item.no.replace(/\./g,'_');
+    const row = document.getElementById(`kpirow_${name}_${key}`);
+    if (row) row.classList.remove('kpi-row-disabled');
+    const btn = document.getElementById(`nabtn_${name}_${key}`);
+    if (btn) {
+      btn.textContent = '✓';
+      btn.className = 'na-btn';
+      btn.title = 'คลิกเพื่อไม่ใช้ KPI นี้';
+    }
+  });
+  // Persist and refresh
+  localStorage.setItem('kpi2026_disabled', JSON.stringify(disabled));
+  localStorage.setItem('kpi2026_weights', JSON.stringify(customWeights));
+  updateAllSectionWeights(name);
+  updatePersonView(name);
+  showToast(`คืนค่า Default Section ${si+1} เรียบร้อย`);
+}
+
+function updateAllSectionWeights(name) {
+  KPI_SECTIONS.forEach((sec, si) => {
+    const el = document.getElementById(`weightstat_${name}_s${si+1}`);
+    const sum = getActiveWeightSum(name, si);
+    const pct = Math.round(sum * 100);
+    const deficit = 100 - pct;
+    if (el) {
+      el.innerHTML = deficit === 0
+        ? `<span class="weight-ok">⚖️ Weight 100%</span>`
+        : `<span class="weight-warn">⚠️ Weight ${pct}% (−${deficit}%)</span>`;
+    }
+    refreshWeightCells(name, si);
+  });
+}
+
+function updatePersonView(name) {
+  // Update section totals + weight status
+  KPI_SECTIONS.forEach((sec, si) => {
+    const pct = calcSection(name, si);
+    const el = document.getElementById(`sectotal_${name}_s${si+1}`);
+    if (el) el.textContent = pct.toFixed(1) + '%';
+  });
+  updateAllSectionWeights(name);
+
+  // Update score panel
+  const total = calcTotal(name);
+  const grade = getGrade(total);
+  const gClass = gradeClass(grade);
+  const panel = document.getElementById('scorepanel_' + name);
+  if (!panel) return;
+
+  const secRows = KPI_SECTIONS.map((sec, si) => {
+    const pct = calcSection(name, si);
+    return `<div class="sec-row">
+      <span class="sec-name">${sec.name}</span>
+      <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
+      <span class="sec-pct">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="margin-right:8px">
+      <div class="big-score">${total.toFixed(1)}<span style="font-size:22px">%</span></div>
+      <div style="font-size:14px;opacity:.85;margin-top:4px">${name}</div>
+    </div>
+    <div style="margin-right:24px;text-align:center">
+      <div class="grade-display">${grade}</div>
+      <div class="grade-label">${gradeLabel(grade)}</div>
+    </div>
+    <div class="sections">${secRows}</div>
+  `;
+
+  renderPersonFunnel(name);
+}
+
+function renderPersonFunnel(name) {
+  const el = document.getElementById('personfunnel_' + name);
+  if (!el) return;
+
+  // Sort KRAs highest → lowest so outermost ring = best KRA
+  const kraData = KPI_SECTIONS.map((sec, si) => ({
+    label: sec.name,
+    pct: calcSection(name, si)
+  })).sort((a, b) => b.pct - a.pct);
+
+  const n = kraData.length;
+
+  // Grade-based colour palette — matches the app's grade legend exactly
+  const GRADE_COLOR = {
+    'A+': '#107c10', 'A': '#0078d4', 'B+': '#8764b8',
+    'B':  '#ca5010', 'C': '#e3008c', 'D':  '#d13438'
+  };
+  const GRADE_BG = {
+    'A+': '#dff6dd', 'A': '#deecf9', 'B+': '#f3effc',
+    'B':  '#fff4ce', 'C': '#fde7f3', 'D':  '#fde7e9'
+  };
+
+  const W  = 220;
+  const cx = W / 2;
+  const cy = W / 2;
+  const strokeW  = 14;
+  const spacing  = 19;
+  const outerR   = cy - 10;
+  const radii = Array.from({length: n}, (_, i) => outerR - i * spacing);
+
+  const rings = kraData.map((d, i) => {
+    const r    = radii[i];
+    const circ = +(2 * Math.PI * r).toFixed(2);
+    const off  = +(circ * (1 - d.pct / 100)).toFixed(2);
+    const g    = getGrade(d.pct);
+    const col  = GRADE_COLOR[g] || '#999';
+    const bg   = GRADE_BG[g]    || '#eee';
+    return `
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+        stroke="${bg}" stroke-width="${strokeW}"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+        stroke="${col}" stroke-width="${strokeW}"
+        stroke-dasharray="${circ}" stroke-dashoffset="${off}"
+        stroke-linecap="round"
+        transform="rotate(-90 ${cx} ${cy})"/>`;
+  }).join('');
+
+  const memberIdx = MEMBERS.indexOf(name);
+  const totalColor = memberIdx >= 0 ? AVATAR_COLORS[memberIdx] : '#0078d4';
+  const total = calcTotal(name);
+  const grade = getGrade(total);
+
+  // Legend rows — colour per grade
+  const legend = kraData.map((d) => {
+    const g   = getGrade(d.pct);
+    const col = GRADE_COLOR[g] || '#999';
+    const bg  = GRADE_BG[g]   || '#eee';
+    const short = d.label.length > 16 ? d.label.slice(0,15) + '…' : d.label;
+    return `<div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <div style="width:28px;height:16px;border-radius:5px;background:${bg};
+        color:${col};font-size:9px;font-weight:800;display:flex;align-items:center;
+        justify-content:center;flex-shrink:0">${g}</div>
+      <div style="font-size:11px;color:#555;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${short}</div>
+      <div style="font-size:12px;font-weight:800;color:${col};white-space:nowrap">${d.pct > 0 ? d.pct.toFixed(1)+'%' : '—'}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${W}" xmlns="http://www.w3.org/2000/svg"
+      style="width:100%;display:block">
+      ${rings}
+      <text x="${cx}" y="${cy - 11}" text-anchor="middle"
+        font-family="Segoe UI,sans-serif" font-size="24" font-weight="900" fill="#111">
+        ${total.toFixed(1)}%
+      </text>
+      <text x="${cx}" y="${cy + 12}" text-anchor="middle"
+        font-family="Segoe UI,sans-serif" font-size="15" font-weight="800" fill="${totalColor}">
+        ${grade}
+      </text>
+      <text x="${cx}" y="${cy + 28}" text-anchor="middle"
+        font-family="Segoe UI,sans-serif" font-size="9" fill="#999">
+        ${gradeLabel(grade)}
+      </text>
+    </svg>
+    <div style="margin-top:6px;padding:0 2px;border-top:1px solid #eee;padding-top:8px">
+      ${legend}
+    </div>`;
+}
+
+
+// ============================================================
+// SAVE HISTORY
+// ============================================================
+let saveHistoryData = {};
+// { 'MemberName': [{ id, ts, totalScore, grade, sectionScores:[...] }, ...], ... }
+// max 30 entries per person, newest first
+
+function loadSaveHistory() {
+  try {
+    const saved = localStorage.getItem('kpi2026_history');
+    if (saved) saveHistoryData = JSON.parse(saved);
+  } catch(e) { saveHistoryData = {}; }
+}
+
+function recordHistory(name) {
+  if (!saveHistoryData[name]) saveHistoryData[name] = [];
+  const entry = {
+    id: Date.now(),
+    ts: new Date().toISOString(),
+    totalScore: calcTotal(name),
+    grade: getGrade(calcTotal(name)),
+    sectionScores: KPI_SECTIONS.map((_, si) => +calcSection(name, si).toFixed(2)),
+  };
+  saveHistoryData[name].unshift(entry);
+  if (saveHistoryData[name].length > 30) saveHistoryData[name].length = 30;
+  try { localStorage.setItem('kpi2026_history', JSON.stringify(saveHistoryData)); } catch(e) {}
+}
+
+function showHistoryModal(name) {
+  const existing = document.getElementById('historyModal');
+  if (existing) existing.remove();
+
+  const entries = saveHistoryData[name] || [];
+  const GCOL = {'A+':'#107c10','A':'#0078d4','B+':'#8764b8','B':'#ca5010','C':'#e3008c','D':'#d13438'};
+  const GBGC = {'A+':'#dff6dd','A':'#deecf9','B+':'#f3effc','B':'#fff4ce','C':'#fde7f3','D':'#fde7e9'};
+
+  const entriesHTML = entries.length === 0
+    ? `<div class="history-empty">⏳ ยังไม่มีประวัติการบันทึก<br>กด 💾 บันทึก เพื่อเริ่มต้น</div>`
+    : entries.map((e, idx) => {
+        const d = new Date(e.ts);
+        const dateStr = d.toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' });
+        const timeStr = d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+        const gc = GCOL[e.grade] || '#333';
+        const gb = GBGC[e.grade] || '#eee';
+        const krabars = KPI_SECTIONS.map((sec, si) => {
+          const pct = e.sectionScores[si] ?? 0;
+          return `<div class="he-kra-row">
+            <span class="he-kra-label">${sec.no}. ${sec.name}</span>
+            <div class="he-kra-track"><div class="he-kra-fill" style="width:${pct}%;background:${GCOL[getGrade(pct)]||'#ccc'}"></div></div>
+            <span class="he-kra-pct" style="color:${GCOL[getGrade(pct)]||'#555'}">${pct.toFixed(1)}%</span>
+          </div>`;
+        }).join('');
+        return `<div class="he-entry" id="he_${e.id}">
+          <div class="he-main" onclick="toggleHistoryEntry('he_${e.id}')">
+            <div class="he-ts"><strong>${dateStr}</strong>${timeStr}</div>
+            <span class="he-score" style="color:${gc}">${e.totalScore.toFixed(1)}%</span>
+            <span class="he-grade" style="color:${gc};background:${gb}">${e.grade}</span>
+            <span class="he-caret">▶</span>
+          </div>
+          <div class="he-detail">
+            <div class="he-kra-bars">${krabars}</div>
+            <div class="he-actions">
+              <button class="he-export-btn" onclick="exportReportFromHistory('${name}',${e.id})">📄 Export Report</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'historyModal';
+  modal.innerHTML = `
+    <div class="history-backdrop" onclick="if(event.target===this)closeHistoryModal()">
+      <div class="history-panel">
+        <div class="history-head">
+          <div>
+            <h3>📋 ประวัติการบันทึก</h3>
+            <p>${name} · ${entries.length} รายการ (สูงสุด 30)</p>
+          </div>
+          <button class="history-close" onclick="closeHistoryModal()">✕</button>
+        </div>
+        <div class="history-body">${entriesHTML}</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeHistoryModal() {
+  const m = document.getElementById('historyModal');
+  if (m) m.remove();
+}
+
+function toggleHistoryEntry(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ============================================================
+// REPORT GENERATION & EXPORT
+// ============================================================
+function generateReportHTML(name, histEntry) {
+  // histEntry = optional history snapshot (for exporting old saves)
+  const now      = histEntry ? new Date(histEntry.ts) : new Date();
+  const totalScore = histEntry ? histEntry.totalScore : calcTotal(name);
+  const grade    = getGrade(totalScore);
+  const dateStr  = now.toLocaleDateString('th-TH', { year:'numeric', month:'long', day:'numeric' });
+  const timeStr  = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+
+  const GCOL = {'A+':'#107c10','A':'#0078d4','B+':'#8764b8','B':'#ca5010','C':'#e3008c','D':'#d13438'};
+  const GBGC = {'A+':'#dff6dd','A':'#deecf9','B+':'#f3effc','B':'#fff4ce','C':'#fde7f3','D':'#fde7e9'};
+  const gc = GCOL[grade] || '#333';
+  const gb = GBGC[grade] || '#eee';
+
+  const sectionRows = KPI_SECTIONS.map((sec, si) => {
+    const secPct = histEntry ? (histEntry.sectionScores[si] ?? 0) : calcSection(name, si);
+    const secGrade = getGrade(secPct);
+    const itemRows = sec.items.filter(item => !isDisabled(name, item.no)).map(item => {
+      const s = scores[name]?.[item.no] ?? null;
+      const w = getItemWeight(name, item.no);
+      const tot = s != null ? (w * s).toFixed(2) : '—';
+      const ev = getEvidence(name, item.no);
+      const noteText = ev.note ? `<div class="ev-note">📝 ${ev.note.replace(/\n/g,'<br>')}</div>` : '';
+      const scoreColor = s === 5 ? '#107c10' : s === 4 ? '#0078d4' : s === 3 ? '#8764b8' : s === 2 ? '#ca5010' : s === 1 ? '#d13438' : '#999';
+      return `<tr>
+        <td class="td-no">${item.no}</td>
+        <td class="td-kpi">${item.kpi}${noteText}</td>
+        <td class="td-meas">${item.measurement}</td>
+        <td class="td-w">${(w*100).toFixed(0)}%</td>
+        <td class="td-s" style="color:${scoreColor};font-weight:900">${s ?? '—'}</td>
+        <td class="td-t">${tot}</td>
+      </tr>`;
+    }).join('');
+    // Custom KPIs
+    const cRows = (customKPIs[sec.id] || []).filter(ci => !isDisabled(name, ci.id)).map((ci, idx) => {
+      const s = scores[name]?.[ci.id] ?? null;
+      const w = ci.weight || 0;
+      const tot = s != null ? (w * s).toFixed(2) : '—';
+      const scoreColor = s === 5 ? '#107c10' : s === 4 ? '#0078d4' : s === 3 ? '#8764b8' : s === 2 ? '#ca5010' : s === 1 ? '#d13438' : '#999';
+      return `<tr class="custom-row">
+        <td class="td-no" style="color:#8764b8">${sec.no}.C${idx+1}</td>
+        <td class="td-kpi">${ci.kpi || '(Custom KPI)'}</td>
+        <td class="td-meas">${ci.measurement || '—'}</td>
+        <td class="td-w">${(w*100).toFixed(0)}%</td>
+        <td class="td-s" style="color:${scoreColor};font-weight:900">${s ?? '—'}</td>
+        <td class="td-t">${tot}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="kra-block">
+      <div class="kra-head" style="background:${GCOL[secGrade]||'#555'}">
+        <span>KRA ${sec.no}: ${sec.name}</span>
+        <span style="font-size:11px;opacity:.85">${sec.nameTh}</span>
+        <span class="kra-score">${secPct.toFixed(1)}%</span>
+      </div>
+      <table class="report-table">
+        <thead><tr><th class="td-no">No.</th><th class="td-kpi">KPI</th><th class="td-meas">Measurement</th><th class="td-w">Weight</th><th class="td-s">Score</th><th class="td-t">Total</th></tr></thead>
+        <tbody>${itemRows}${cRows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  const memberIdx = MEMBERS.indexOf(name);
+  const avatarColor = memberIdx >= 0 ? AVATAR_COLORS[memberIdx] : '#0078d4';
+
+  return `<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>KPI Report — ${name} — ${dateStr}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font-size:13px}
+.page{max-width:900px;margin:0 auto;padding:28px 24px 48px}
+/* HEADER */
+.rpt-header{background:linear-gradient(135deg,#0078d4,#005a9e);color:white;border-radius:14px;padding:24px 28px;margin-bottom:20px;display:flex;align-items:center;gap:20px}
+.avatar{width:56px;height:56px;border-radius:50%;background:${avatarColor};color:white;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,.4)}
+.rpt-title{font-size:11px;opacity:.8;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
+.rpt-name{font-size:24px;font-weight:900;margin-bottom:2px}
+.rpt-date{font-size:12px;opacity:.8}
+.rpt-meta{margin-left:auto;text-align:right}
+.rpt-meta .lbl{font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.5px}
+/* SUMMARY */
+.summary-card{background:white;border-radius:12px;padding:20px 24px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;align-items:center;gap:28px;border:1px solid #e1e8f0}
+.big-score{font-size:56px;font-weight:900;color:${gc};line-height:1}
+.grade-badge{font-size:28px;font-weight:900;background:${gb};color:${gc};padding:6px 16px;border-radius:12px}
+.grade-lbl{font-size:13px;color:#555;margin-top:4px}
+.kra-summary{flex:1}
+.kra-sum-row{display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:6px}
+.kra-sum-label{width:200px;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kra-sum-track{flex:1;height:8px;background:#e8edf5;border-radius:4px;overflow:hidden}
+.kra-sum-fill{height:100%;border-radius:4px}
+.kra-sum-pct{width:40px;text-align:right;font-weight:700}
+/* KRA BLOCKS */
+.kra-block{background:white;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);border:1px solid #e1e8f0}
+.kra-head{color:white;padding:10px 16px;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:700}
+.kra-head span:last-child,.kra-score{margin-left:auto;font-size:16px;font-weight:900}
+.report-table{width:100%;border-collapse:collapse;font-size:12px}
+.report-table th{background:#f0f7ff;padding:8px 10px;font-weight:700;color:#555;border-bottom:2px solid #e1e8f0;text-align:left}
+.report-table td{padding:8px 10px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+.report-table tr:last-child td{border-bottom:none}
+.report-table tr:hover td{background:#fafbff}
+.custom-row td{background:#fdf8ff!important}
+.td-no{width:52px;color:#0078d4;font-weight:700}
+.td-kpi{min-width:200px}
+.td-meas{min-width:140px;color:#555}
+.td-w{width:60px;text-align:center;font-weight:700;color:#0078d4}
+.td-s{width:52px;text-align:center;font-size:16px}
+.td-t{width:60px;text-align:center;font-weight:700}
+.ev-note{font-size:10.5px;color:#0078d4;margin-top:3px;font-style:italic}
+/* SIGNATURE */
+.sign-section{display:flex;gap:40px;margin-top:32px}
+.sign-box{flex:1;text-align:center}
+.sign-line{border-bottom:1.5px solid #333;margin:32px 0 8px}
+.sign-label{font-size:12px;color:#555}
+/* FOOTER */
+.rpt-footer{text-align:center;color:#aaa;font-size:10.5px;margin-top:28px;padding-top:16px;border-top:1px solid #e1e8f0}
+@media print{body{background:white}.page{padding:12px 8px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="rpt-header">
+    <div class="avatar">${name.slice(0,2).toUpperCase()}</div>
+    <div>
+      <div class="rpt-title">KPI Evaluation Report · Microsoft Team · 2026</div>
+      <div class="rpt-name">${name}</div>
+      <div class="rpt-date">วันที่ประเมิน: ${dateStr} · ${timeStr}</div>
+    </div>
+    <div class="rpt-meta">
+      <div class="lbl">Generated</div>
+      <div style="font-size:12px;opacity:.85">${new Date().toLocaleDateString('th-TH')}</div>
+    </div>
+  </div>
+
+  <div class="summary-card">
+    <div>
+      <div class="big-score">${totalScore.toFixed(1)}%</div>
+    </div>
+    <div>
+      <div class="grade-badge">${grade}</div>
+      <div class="grade-lbl">${gradeLabel(grade)}</div>
+    </div>
+    <div class="kra-summary">
+      ${KPI_SECTIONS.map((sec, si) => {
+        const p = histEntry ? (histEntry.sectionScores[si] ?? 0) : calcSection(name, si);
+        const c = GCOL[getGrade(p)] || '#ccc';
+        return `<div class="kra-sum-row">
+          <span class="kra-sum-label">${sec.no}. ${sec.name}</span>
+          <div class="kra-sum-track"><div class="kra-sum-fill" style="width:${p}%;background:${c}"></div></div>
+          <span class="kra-sum-pct" style="color:${c}">${p.toFixed(1)}%</span>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  ${sectionRows}
+
+  <div class="sign-section">
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ประเมิน (Evaluator)</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ถูกประเมิน (${name})</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้อนุมัติ (Approver)</div></div>
+  </div>
+
+  <div class="rpt-footer">
+    KPI Evaluation System 2026 · Microsoft Team · สร้างเมื่อ ${new Date().toLocaleString('th-TH')}
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+async function exportReport(name, histEntry) {
+  const now  = histEntry ? new Date(histEntry.ts) : new Date();
+  const yy   = now.getFullYear();
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const fileName = `${name}_${yy}${mm}${dd}.html`;
+  const html = generateReportHTML(name, histEntry || null);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+
+  if (window.showDirectoryPicker) {
+    try {
+      const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'desktop' });
+      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+      const writable   = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      showToast(`✅ บันทึก ${fileName} เรียบร้อย`);
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // user cancelled
+      // fall through to download
+    }
+  }
+  // Fallback: browser download
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href     = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`📥 ${fileName} — กรุณาย้ายไปที่ ..\\Report`);
+}
+
+function exportReportFromHistory(name, entryId) {
+  const entries = saveHistoryData[name] || [];
+  const entry   = entries.find(e => e.id === entryId);
+  exportReport(name, entry || null);
+}
+
+// ============================================================
+// RUBRIC POPOVER
+// ============================================================
+let _rubricHideTimer = null;
+
+const _RUBRIC_SCORE_STYLE = {
+  5: { bg:'#dff6dd', color:'#107c10' },
+  4: { bg:'#deecf9', color:'#0078d4' },
+  3: { bg:'#f3effc', color:'#8764b8' },
+  2: { bg:'#fff4ce', color:'#ca5010' },
+  1: { bg:'#fde7e9', color:'#d13438' },
+};
+const _RUBRIC_LEVEL_NAMES = { 5:'ดีเยี่ยม', 4:'ดี', 3:'ผ่านเกณฑ์', 2:'พอใช้', 1:'ต้องปรับปรุง' };
+
+function showRubric(no, anchorEl) {
+  clearTimeout(_rubricHideTimer);
+  const rubric = KPI_RUBRIC[no];
+  const pop = document.getElementById('rubricPopover');
+  if (!pop) return;
+  if (!rubric) { pop.classList.remove('visible'); return; }
+
+  const rows = [5,4,3,2,1].map(s => {
+    const st = _RUBRIC_SCORE_STYLE[s];
+    return `<div class="rp-row">
+      <div class="rp-score-badge" style="background:${st.bg};color:${st.color}">${s}</div>
+      <div>
+        <div class="rp-level-name" style="color:${st.color}">${_RUBRIC_LEVEL_NAMES[s]}</div>
+        <div class="rp-level-text">${rubric.levels[s] || ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  pop.innerHTML = `
+    <div class="rp-header">
+      <div class="rp-title">${no} · ${rubric.title}</div>
+      <div class="rp-target">📏 ${rubric.target}</div>
+    </div>
+    ${rows}`;
+
+  pop.classList.add('visible');
+
+  // Position: prefer right of anchor, flip left if clipped
+  const rect = anchorEl.getBoundingClientRect();
+  const pw = 420, ph = 290;
+  let left = rect.right + 10;
+  let top  = rect.top;
+  if (left + pw > window.innerWidth - 10) left = rect.left - pw - 10;
+  if (left < 8) left = 8;
+  if (top + ph > window.innerHeight - 10) top = window.innerHeight - ph - 10;
+  if (top < 8) top = 8;
+  pop.style.left = left + 'px';
+  pop.style.top  = top  + 'px';
+}
+
+function hideRubric(delay) {
+  _rubricHideTimer = setTimeout(() => {
+    const pop = document.getElementById('rubricPopover');
+    if (pop) pop.classList.remove('visible');
+  }, delay != null ? delay : 200);
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+
+  // Find matching nav button
+  const navBtns = document.querySelectorAll('nav button');
+  navBtns.forEach(btn => {
+    const onclick = btn.getAttribute('onclick') || '';
+    if (onclick.includes(`'${id}'`)) btn.classList.add('active');
+  });
+
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'compare') renderCompare();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  cloudInit();   // set up Supabase client if configured
+  // Login enabled: show the credential screen. Data is loaded in doLogin()
+  // after a successful sign-in (which also pulls the shared cloud copy).
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginUsername').focus();
+});
+</script>
+<style>
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</body>
+</html>
