@@ -2969,9 +2969,25 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font
 .sign-box{flex:1;text-align:center}
 .sign-line{border-bottom:1.5px solid #333;margin:32px 0 8px}
 .sign-label{font-size:12px;color:#555}
+.sign-date{font-size:10.5px;color:#999;margin-top:6px}
+.approver-box{background:#fff;border:1px solid #e1e8f0;border-radius:12px;padding:16px 20px;margin-top:20px}
+.approver-box .ab-title{font-size:12px;font-weight:800;color:#0067c0;margin-bottom:10px}
+.approver-box .ab-lines{border-bottom:1px dashed #cbd5e6;height:24px;margin-bottom:10px}
+.approver-box .ab-reco{font-size:12px;color:#333;background:#f5f9ff;border-radius:8px;padding:8px 12px}
 /* FOOTER */
 .rpt-footer{text-align:center;color:#aaa;font-size:10.5px;margin-top:28px;padding-top:16px;border-top:1px solid #e1e8f0}
-@media print{body{background:white}.page{padding:12px 8px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@page{size:A4;margin:12mm 10mm}
+@media print{
+  body{background:#fff}
+  .page{padding:0;max-width:100%}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rpt-header,.summary-card,.kra-block,.sign-section,.approver-box{box-shadow:none !important}
+  .kra-block{break-inside:avoid;page-break-inside:avoid;border:1px solid #d8e0ec}
+  .report-table tr{break-inside:avoid;page-break-inside:avoid}
+  .report-table thead{display:table-header-group}
+  .report-table tr:hover td{background:none}
+  .summary-card,.rpt-header,.approver-box,.sign-section{break-inside:avoid;page-break-inside:avoid}
+}
 </style>
 </head>
 <body>
@@ -2979,7 +2995,7 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font
   <div class="rpt-header">
     <div class="avatar">${name.slice(0,2).toUpperCase()}</div>
     <div>
-      <div class="rpt-title">KPI Evaluation Report · Microsoft Team · 2026</div>
+      <div class="rpt-title">KPI Evaluation Report · Microsoft Team · 2026 · ${ROUND_LABEL[currentRound]}</div>
       <div class="rpt-name">${fullName(name)}</div>
       <div style="font-size:12px;opacity:.85">${MEMBER_INFO[name]?MEMBER_INFO[name].eng:''}${MEMBER_INFO[name]&&MEMBER_INFO[name].nick?' · '+MEMBER_INFO[name].nick:''} · ${deptName(name)}</div>
       <div style="font-size:11px;opacity:.8">${MEMBER_INFO[name]&&MEMBER_INFO[name].pos?MEMBER_INFO[name].pos:''}</div>
@@ -3014,10 +3030,17 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;color:#111;background:#f3f6fb;font
 
   ${sectionRows}
 
+  <div class="approver-box">
+    <div class="ab-title">ความเห็น / ข้อเสนอแนะของผู้บังคับบัญชา (สำหรับพิจารณาปรับเงินเดือน / โบนัส)</div>
+    <div class="ab-lines"></div>
+    <div class="ab-lines"></div>
+    <div class="ab-reco">ผลการประเมินโดยรวม (${ROUND_LABEL[currentRound]}): <b>${totalScore.toFixed(1)}%</b> · เกรด <b>${grade}</b> — ${gradeLabel(grade)}</div>
+  </div>
+
   <div class="sign-section">
-    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ประเมิน (Evaluator)</div></div>
-    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ถูกประเมิน (${name})</div></div>
-    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้อนุมัติ (Approver)</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ประเมิน (Evaluator)</div><div class="sign-date">วันที่ ......../......../........</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้ถูกประเมิน<br>${fullName(name)}</div><div class="sign-date">วันที่ ......../......../........</div></div>
+    <div class="sign-box"><div class="sign-line"></div><div class="sign-label">ผู้อนุมัติ / HR (Approver)</div><div class="sign-date">วันที่ ......../......../........</div></div>
   </div>
 
   <div class="rpt-footer">
