@@ -606,18 +606,44 @@
   <div class="login-card">
     <div class="login-logo">📊</div>
     <div class="login-title">KPI Evaluation System 2026</div>
-    <div class="login-sub">Microsoft Team · กรุณาเข้าสู่ระบบ</div>
-    <div class="login-field">
-      <label>Username</label>
-      <input type="text" id="loginUsername" placeholder="กรอก username" autocomplete="username"
-        onkeydown="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+    <div class="login-sub">สำหรับหัวหน้าแผนก (Manager) · เข้าสู่ระบบด้วยอีเมลองค์กร</div>
+    <div id="emailStep">
+      <div class="login-field">
+        <label>อีเมลองค์กร (@got.co.th)</label>
+        <input type="email" id="loginEmail" placeholder="name@got.co.th" autocomplete="email"
+          onkeydown="if(event.key==='Enter')sendOtp()">
+      </div>
+      <button class="login-btn" onclick="sendOtp()">📧 ส่งรหัส OTP ไปที่อีเมล</button>
+      <div style="margin-top:14px;text-align:center">
+        <a href="#" onclick="showAdminLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">เข้าสู่ระบบผู้ดูแล (Admin) →</a>
+      </div>
     </div>
-    <div class="login-field">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="กรอก password" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="adminStep" style="display:none">
+      <div class="login-field">
+        <label>Username (Admin)</label>
+        <input type="text" id="adminUser" autocomplete="username"
+          onkeydown="if(event.key==='Enter')document.getElementById('adminPass').focus()">
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="adminPass" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')doAdminLogin()">
+      </div>
+      <button class="login-btn" onclick="doAdminLogin()">🔑 เข้าสู่ระบบผู้ดูแล</button>
+      <div style="margin-top:12px;text-align:center">
+        <a href="#" onclick="resetLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">← กลับไปล็อกอินด้วยอีเมล</a>
+      </div>
     </div>
-    <button class="login-btn" onclick="doLogin()">🔑 เข้าสู่ระบบ</button>
+    <div id="otpStep" style="display:none">
+      <div class="login-field">
+        <label>รหัส OTP 6 หลัก (ส่งไปที่อีเมลของคุณ)</label>
+        <input type="text" id="loginOtp" inputmode="numeric" maxlength="6" placeholder="______"
+          style="letter-spacing:8px;text-align:center;font-size:20px;font-weight:700"
+          onkeydown="if(event.key==='Enter')verifyOtp()">
+      </div>
+      <button class="login-btn" onclick="verifyOtp()">🔓 ยืนยันเข้าสู่ระบบ</button>
+      <button class="login-btn" style="background:#eef2fb;color:#0067c0;margin-top:8px" onclick="resetLogin()">↩︎ เปลี่ยนอีเมล / ขอรหัสใหม่</button>
+    </div>
     <div class="login-error" id="loginError"></div>
   </div>
 </div>
@@ -855,51 +881,124 @@ const USERS = {
 };
 
 let currentUser = null;
+let lockDept = null;      // manager: restrict to own dept
+let _pendingEmail = null; // email awaiting OTP verification
 
-async function doLogin() {
-  const usernameRaw = document.getElementById('loginUsername').value.trim();
-  const password    = document.getElementById('loginPassword').value;
-  const errEl       = document.getElementById('loginError');
-  const username    = usernameRaw.toLowerCase();
+// ---- Manager access control: email -> department ----
+// (แก้อีเมลได้ตรงนี้) หัวหน้า/รองแต่ละแผนก
+const MANAGER_MAP = {
+  'panotwong@got.co.th': '3301',
+  'arnachak@got.co.th':  '3302',   // *ยืนยันอีเมล
+  'yongyote@got.co.th':  '3303',
+  'sattaya@got.co.th':   '3304',   // *ยืนยันอีเมล
+  'prapatsorn@got.co.th':'3305',
+  'chettha@got.co.th':   '3306',
+};
+// อีเมลที่เห็นได้ทุกแผนก (HR / ผู้บริหาร) — เพิ่มได้ตามต้องการ
+const ADMIN_EMAILS = [];
 
-  const user = USERS[username];
-  if (!user || user.password !== password) {
+function _shakeLogin(){
+  const card = document.querySelector('.login-card');
+  card.style.animation = 'none'; card.offsetHeight; card.style.animation = 'shake 0.35s ease';
+}
+function resetLogin(){
+  _pendingEmail = null;
+  const es = document.getElementById('emailStep'), os = document.getElementById('otpStep'), as = document.getElementById('adminStep');
+  if (es) es.style.display = 'block';
+  if (os) os.style.display = 'none';
+  if (as) as.style.display = 'none';
+  const oe = document.getElementById('loginOtp'); if (oe) oe.value = '';
+  const ee = document.getElementById('loginError'); if (ee) ee.textContent = '';
+  const em = document.getElementById('loginEmail'); if (em) em.focus();
+}
+
+function showAdminLogin(){
+  document.getElementById('emailStep').style.display = 'none';
+  document.getElementById('otpStep').style.display = 'none';
+  document.getElementById('adminStep').style.display = 'block';
+  document.getElementById('loginError').textContent = '';
+  const u = document.getElementById('adminUser'); if (u) u.focus();
+}
+
+async function doAdminLogin(){
+  const errEl = document.getElementById('loginError');
+  const u = (document.getElementById('adminUser').value || '').trim().toLowerCase();
+  const p = document.getElementById('adminPass').value || '';
+  const user = USERS[u];
+  if (!user || user.role !== 'admin' || user.password !== p){
     errEl.textContent = '❌ Username หรือ Password ไม่ถูกต้อง';
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginPassword').focus();
-    const card = document.querySelector('.login-card');
-    card.style.animation = 'none';
-    card.offsetHeight;
-    card.style.animation = 'shake 0.35s ease';
+    document.getElementById('adminPass').value = '';
+    _shakeLogin();
     return;
   }
+  currentUser = { role: 'admin', email: user.name || 'Admin', dept: null };
+  await afterLogin();
+}
 
-  currentUser = { ...user, username };
-  errEl.textContent = '';
+async function sendOtp(){
+  const errEl = document.getElementById('loginError');
+  const email = (document.getElementById('loginEmail').value || '').trim().toLowerCase();
+  if (!email || email.indexOf('@') < 0){ errEl.textContent = 'กรุณากรอกอีเมลให้ถูกต้อง'; _shakeLogin(); return; }
+  if (!MANAGER_MAP[email] && ADMIN_EMAILS.indexOf(email) < 0){
+    errEl.textContent = '❌ อีเมลนี้ไม่มีสิทธิ์เข้าใช้งาน (เฉพาะหัวหน้าแผนก)'; _shakeLogin(); return;
+  }
+  if (!_sb){ errEl.textContent = '⚠️ ระบบยืนยันตัวตนยังไม่พร้อม (cloud ปิดอยู่)'; return; }
+  errEl.textContent = '⏳ กำลังส่งรหัส OTP...';
+  try {
+    const { error } = await _sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    if (error) throw error;
+    _pendingEmail = email;
+    document.getElementById('emailStep').style.display = 'none';
+    document.getElementById('otpStep').style.display = 'block';
+    errEl.textContent = '✅ ส่งรหัสไปที่ ' + email + ' แล้ว (ตรวจกล่องอีเมล / สแปม)';
+    const oe = document.getElementById('loginOtp'); if (oe) oe.focus();
+  } catch(e){
+    errEl.textContent = '❌ ส่ง OTP ไม่สำเร็จ: ' + (e.message || e);
+  }
+}
+
+async function verifyOtp(){
+  const errEl = document.getElementById('loginError');
+  const token = (document.getElementById('loginOtp').value || '').trim();
+  if (token.length < 6){ errEl.textContent = 'กรอกรหัส OTP 6 หลัก'; return; }
+  if (!_sb || !_pendingEmail){ errEl.textContent = 'กรุณาขอรหัส OTP ใหม่'; return; }
+  errEl.textContent = '⏳ กำลังตรวจสอบรหัส...';
+  try {
+    const { error } = await _sb.auth.verifyOtp({ email: _pendingEmail, token, type: 'email' });
+    if (error) throw error;
+    const email = _pendingEmail;
+    const dept  = MANAGER_MAP[email] || null;
+    const role  = (ADMIN_EMAILS.indexOf(email) >= 0) ? 'admin' : 'manager';
+    currentUser = { role, email, dept };
+    await afterLogin();
+  } catch(e){
+    errEl.textContent = '❌ รหัส OTP ไม่ถูกต้องหรือหมดอายุ'; _shakeLogin();
+  }
+}
+
+async function afterLogin(){
+  document.getElementById('loginError').textContent = '';
   document.getElementById('loginOverlay').style.display = 'none';
-
   const headerUser = document.getElementById('headerUser');
   headerUser.style.display = 'flex';
-  document.getElementById('headerUserName').textContent =
-    (user.role === 'admin' ? '👑 ' : '👤 ') + user.name;
-
-  await cloudPull();            // fetch shared data first (no-op if cloud off)
+  const roleTag = currentUser.role === 'admin' ? '👑 ' : '👤 ';
+  const deptTxt = currentUser.dept ? ' · ' + DEPARTMENTS[currentUser.dept].name : ' · ทุกแผนก';
+  document.getElementById('headerUserName').textContent = roleTag + currentUser.email + deptTxt;
+  await cloudPull();
   loadAllLocal();
   loadDeptFilter();
   buildPersonPages();
-  buildNav();
-  buildDeptFilter();
   applyRoleUI();
   updateRoundUI();
 }
 
-function doLogout() {
+async function doLogout() {
   if (!confirm('ออกจากระบบ?')) return;
-  currentUser = null;
+  try { if (_sb) await _sb.auth.signOut(); } catch(e){}
+  currentUser = null; lockDept = null;
+  resetLogin();
+  document.getElementById('loginEmail').value = '';
   document.getElementById('loginOverlay').style.display = 'flex';
-  document.getElementById('loginUsername').value = '';
-  document.getElementById('loginPassword').value = '';
-  document.getElementById('loginError').textContent = '';
   document.getElementById('headerUser').style.display = 'none';
   document.body.classList.remove('member-mode');
   document.querySelectorAll('nav button').forEach(b => b.style.display = '');
@@ -907,22 +1006,20 @@ function doLogout() {
 
 function applyRoleUI() {
   if (!currentUser) return;
-  if (currentUser.role === 'admin') {
-    document.body.classList.remove('member-mode');
-    document.querySelectorAll('nav button').forEach(b => b.style.display = '');
-    const np = document.getElementById('navPersons'); if (np) np.style.display = 'contents';
-    renderDashboard();
-    showPage('dashboard');
+  document.body.classList.remove('member-mode');
+  document.querySelectorAll('nav button').forEach(b => b.style.display = '');
+  const np = document.getElementById('navPersons'); if (np) np.style.display = 'contents';
+  if (currentUser.role === 'manager' && currentUser.dept) {
+    lockDept = currentUser.dept;
+    deptFilter = lockDept;
+    try { localStorage.setItem('kpi2026_deptFilter', lockDept); } catch(e){}
   } else {
-    const memberName = currentUser.key;
-    document.querySelectorAll('nav button').forEach(btn => {
-      const oc = btn.getAttribute('onclick') || '';
-      if (oc.includes("'dashboard'") || oc.includes("'compare'")) btn.style.display = 'none';
-    });
-    const np = document.getElementById('navPersons'); if (np) np.style.display = 'none';
-    document.body.classList.add('member-mode');
-    showPage('person_' + memberName);
+    lockDept = null;
   }
+  buildNav();
+  buildDeptFilter();
+  renderDashboard();
+  showPage('dashboard');
 }
 
 (function injectShakeKeyframe() {
@@ -1644,6 +1741,11 @@ function setDeptFilter(v){ deptFilter = v; try{ localStorage.setItem('kpi2026_de
 function filteredMembers(){ return deptFilter==='all' ? MEMBERS.slice() : MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept===deptFilter); }
 function buildDeptFilter(){
   const el = document.getElementById('deptFilter'); if(!el) return;
+  if (lockDept) {
+    el.innerHTML = `<option value="${lockDept}">${lockDept} · ${DEPARTMENTS[lockDept].name}</option>`;
+    el.value = lockDept; el.disabled = true; return;
+  }
+  el.disabled = false;
   let html = '<option value="all">ทุกแผนก (ทั้งฝ่าย ITS)</option>';
   Object.keys(DEPARTMENTS).forEach(code => {
     const n = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept===code).length;
@@ -1720,6 +1822,7 @@ function buildNav() {
   if (!el) return;
   let html = '';
   Object.keys(DEPARTMENTS).forEach(code => {
+    if (lockDept && code !== lockDept) return;
     const mem = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code);
     if (!mem.length) return;
     const short = DEPT_SHORT[code] || code;
@@ -1901,7 +2004,8 @@ let compareChart = null;
 function renderCompare() {
   // Rank table
   const tbody = [];
-  const memberData = MEMBERS.map(name => {
+  const _pool = lockDept ? MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === lockDept) : MEMBERS;
+  const memberData = _pool.map(name => {
     const total = calcTotal(name);
     const sections = KPI_SECTIONS.map((_, si) => calcSection(name, si));
     return { name, total, sections, grade: getGrade(total) };
@@ -3244,7 +3348,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Login enabled: show the credential screen. Data is loaded in doLogin()
   // after a successful sign-in (which also pulls the shared cloud copy).
   document.getElementById('loginOverlay').style.display = 'flex';
-  document.getElementById('loginUsername').focus();
+  const _le = document.getElementById('loginEmail'); if (_le) _le.focus();
 });
 </script>
 <style>
