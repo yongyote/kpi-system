@@ -951,7 +951,12 @@ async function sendOtp(){
     document.getElementById('linkSentStep').style.display = 'block';
     errEl.textContent = '✅ ส่งลิงก์ไปที่ ' + email + ' แล้ว';
   } catch(e){
-    errEl.textContent = '❌ ส่งลิงก์ไม่สำเร็จ: ' + (e.message || e);
+    const msg = (e && e.message ? e.message : String(e)).toLowerCase();
+    if (msg.indexOf('rate limit') >= 0 || msg.indexOf('rate_limit') >= 0) {
+      errEl.innerHTML = '⏳ ติด rate limit ของอีเมลฟรีในตัว Supabase ซึ่งจำกัดต่ำมาก (ประมาณ 2–4 ฉบับต่อชั่วโมงต่อโปรเจกต์)<br>กรุณารอสักครู่แล้วลองใหม่ หรือใช้ทางเข้า Admin ไปก่อน';
+    } else {
+      errEl.textContent = '❌ ส่งลิงก์ไม่สำเร็จ: ' + (e.message || e);
+    }
   }
 }
 
