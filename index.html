@@ -615,12 +615,12 @@
       </div>
       <button class="login-btn" onclick="sendOtp()">📧 ส่งรหัส OTP ไปที่อีเมล</button>
       <div style="margin-top:14px;text-align:center">
-        <a href="#" onclick="showAdminLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">เข้าสู่ระบบผู้ดูแล (Admin) →</a>
+        <a href="#" onclick="showAdminLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">เข้าสู่ระบบด้วยรหัสผ่าน (หัวหน้าแผนก / Admin) →</a>
       </div>
     </div>
     <div id="adminStep" style="display:none">
       <div class="login-field">
-        <label>Username (Admin)</label>
+        <label>Username (ชื่อภาษาอังกฤษ)</label>
         <input type="text" id="adminUser" autocomplete="username"
           onkeydown="if(event.key==='Enter')document.getElementById('adminPass').focus()">
       </div>
@@ -629,7 +629,7 @@
         <input type="password" id="adminPass" autocomplete="current-password"
           onkeydown="if(event.key==='Enter')doAdminLogin()">
       </div>
-      <button class="login-btn" onclick="doAdminLogin()">🔑 เข้าสู่ระบบผู้ดูแล</button>
+      <button class="login-btn" onclick="doAdminLogin()">🔑 เข้าสู่ระบบ</button>
       <div style="margin-top:12px;text-align:center">
         <a href="#" onclick="resetLogin();return false" style="font-size:12px;color:#0067c0;text-decoration:none">← กลับไปล็อกอินด้วยอีเมล</a>
       </div>
@@ -871,13 +871,13 @@ function loadAllLocal() {
 // AUTH — Login / Logout / Role
 // ============================================================
 const USERS = {
-  'admin':     { password: 'admin2026',     role: 'admin',  name: 'Admin',     key: null },
-  'pongwit':   { password: 'Pongwit2026',   role: 'member', name: 'Pongwit',   key: '63259' },
-  'ratthawit': { password: 'Ratthawit2026', role: 'member', name: 'Ratthawit', key: '62246' },
-  'panupat':   { password: 'Panupat2026',   role: 'member', name: 'Panupat',   key: '65298' },
-  'natthapas': { password: 'Natthapas2026', role: 'member', name: 'Natthapas', key: '66312' },
-  'nathapong': { password: 'Nathapong2026', role: 'member', name: 'Nathapong', key: '69377' },
-  'namo':      { password: 'Namo2026',      role: 'member', name: 'Namo',      key: '69381' },
+  'admin':      { password: 'admin2026',      role: 'admin',   name: 'Admin' },
+  'panotwong':  { password: 'Panotwong2026',  role: 'manager', name: 'Panotwong',  dept: '3301' },
+  'arnachak':   { password: 'Arnachak2026',   role: 'manager', name: 'Arnachak',   dept: '3302' },
+  'yongyote':   { password: 'Yongyote2026',   role: 'manager', name: 'Yongyote',   dept: '3303' },
+  'sattaya':    { password: 'Sattaya2026',    role: 'manager', name: 'Sattaya',    dept: '3304' },
+  'prapatsorn': { password: 'Prapatsorn2026', role: 'manager', name: 'Prapatsorn', dept: '3305' },
+  'chettha':    { password: 'Chettha2026',    role: 'manager', name: 'Chettha',    dept: '3306' },
 };
 
 let currentUser = null;
@@ -925,13 +925,13 @@ async function doAdminLogin(){
   const u = (document.getElementById('adminUser').value || '').trim().toLowerCase();
   const p = document.getElementById('adminPass').value || '';
   const user = USERS[u];
-  if (!user || user.role !== 'admin' || user.password !== p){
+  if (!user || user.password !== p){
     errEl.textContent = '❌ Username หรือ Password ไม่ถูกต้อง';
     document.getElementById('adminPass').value = '';
     _shakeLogin();
     return;
   }
-  currentUser = { role: 'admin', email: user.name || 'Admin', dept: null };
+  currentUser = { role: user.role, email: user.name, dept: user.dept || null };
   await afterLogin();
 }
 
@@ -1044,6 +1044,8 @@ function applyRoleUI() {
     try { localStorage.setItem('kpi2026_deptFilter', lockDept); } catch(e){}
   } else {
     lockDept = null;
+    deptFilter = 'all';
+    try { localStorage.setItem('kpi2026_deptFilter', 'all'); } catch(e){}
   }
   buildNav();
   buildDeptFilter();
