@@ -417,6 +417,7 @@
     transition: all 0.15s; margin-top: 4px;
   }
   .kpi-custom-save-btn:hover { background: #dff6dd; }
+  .kpi-field-input[readonly], .kpi-field-input:disabled { background: #f4f6fa; color: #555; cursor: default; border-style: dashed; }
   .add-kpi-row td {
     padding: 8px 12px !important; border-top: 1px dashed #d8c8f0 !important;
   }
@@ -2300,6 +2301,11 @@ function buildCustomKPIRows(name, sec, si) {
     const escFreq = (citem.freq || 'Yearly').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const wPct    = Math.round((citem.weight || 0.1) * 100);
     const totalVal = s ? ((citem.weight || 0.1) * s).toFixed(2) : '—';
+    const _ro  = citem.locked ? 'readonly' : '';
+    const _rod = citem.locked ? 'disabled' : '';
+    const lockBtn = citem.locked
+      ? `<button class="kpi-custom-save-btn admin-only" style="color:#8764b8" onclick="unlockCustomKPI('${sec.id}','${citem.id}')" title="ปลดล็อกเพื่อแก้ไข">✏️</button>`
+      : `<button class="kpi-custom-save-btn admin-only" onclick="saveCustomKPI('${sec.id}','${citem.id}')" title="บันทึก & ล็อก KPI นี้">💾</button>`;
     return `<tr id="kpirow_${name}_${citem.id}" class="kpi-custom-row${naDisabled?' kpi-row-disabled':''}">
       <td class="no-col" style="vertical-align:top;padding-top:12px">
         <div style="font-weight:800;color:#8764b8;font-size:12px">${sec.no}.C${ci+1}</div>
@@ -2308,33 +2314,33 @@ function buildCustomKPIRows(name, sec, si) {
           title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
           ${naDisabled?'N/A':'✓'}
         </button>
-        <button class="kpi-custom-save-btn admin-only" onclick="saveAll()" title="บันทึก KPI นี้">💾</button>
+        ${lockBtn}
         <button class="kpi-custom-del-btn admin-only" onclick="removeCustomKPI('${sec.id}','${citem.id}')" title="ลบ KPI นี้">🗑</button>
       </td>
       <td class="kpi-text">
-        <input class="kpi-field-input" value="${escKpi}" placeholder="ระบุ KPI ที่ต้องการวัด..."
+        <input class="kpi-field-input" value="${escKpi}" placeholder="ระบุ KPI ที่ต้องการวัด..." ${_ro}
           oninput="updateCustomKPIField('${sec.id}','${citem.id}','kpi',this.value)">
         <button class="rubric-set-toggle admin-only" onclick="toggleCustomRubric('${name}','${citem.id}')">⚙ ตั้งเกณฑ์คะแนน 1–5</button>
         <div id="crubric_${name}_${citem.id}" class="custom-rubric-editor" style="display:none">
           ${[5,4,3,2,1].map(v => `<div class="cr-row">
             <span class="cr-badge" style="background:${_RUBRIC_SCORE_STYLE[v].bg};color:${_RUBRIC_SCORE_STYLE[v].color}">${v}</span>
-            <input class="kpi-field-input cr-input" value="${((citem.rubric&&citem.rubric[v])||'').replace(/"/g,'&quot;')}" placeholder="เกณฑ์สำหรับคะแนน ${v}..."
+            <input class="kpi-field-input cr-input" value="${((citem.rubric&&citem.rubric[v])||'').replace(/"/g,'&quot;')}" placeholder="เกณฑ์สำหรับคะแนน ${v}..." ${_ro}
               oninput="updateCustomRubric('${sec.id}','${citem.id}',${v},this.value)">
           </div>`).join('')}
         </div>
       </td>
       <td style="font-size:12px;min-width:180px">
-        <input class="kpi-field-input" value="${escMeas}" placeholder="เกณฑ์การวัด เช่น ≥ 90%"
+        <input class="kpi-field-input" value="${escMeas}" placeholder="เกณฑ์การวัด เช่น ≥ 90%" ${_ro}
           oninput="updateCustomKPIField('${sec.id}','${citem.id}','measurement',this.value)">
       </td>
       <td>
-        <input class="kpi-field-input" style="width:88px" value="${escFreq}" placeholder="Frequency"
+        <input class="kpi-field-input" style="width:88px" value="${escFreq}" placeholder="Frequency" ${_ro}
           oninput="updateCustomKPIField('${sec.id}','${citem.id}','freq',this.value)">
       </td>
       <td class="weight-cell" style="white-space:nowrap">
         <input type="number" class="kpi-field-input" id="cwval_${name}_${citem.id}"
           style="width:44px;text-align:center;font-weight:800;color:#8764b8"
-          value="${wPct}" min="1" max="100" step="1"
+          value="${wPct}" min="1" max="100" step="1" ${_rod}
           onchange="updateCustomKPIWeight('${sec.id}','${citem.id}',this.value)">%
       </td>
       <td style="text-align:left;min-width:200px">
@@ -2345,6 +2351,20 @@ function buildCustomKPIRows(name, sec, si) {
   }).join('');
 }
 
+function saveCustomKPI(secId, id){
+  const c = (customKPIs[secId] || []).find(x => x.id === id);
+  if (c) c.locked = true;
+  saveAll();
+  const si = KPI_SECTIONS.findIndex(s => s.id === secId);
+  if (si >= 0) rebuildSectionTbodyForAllMembers(si);
+  showToast('บันทึก & ล็อก KPI แล้ว ✓');
+}
+function unlockCustomKPI(secId, id){
+  const c = (customKPIs[secId] || []).find(x => x.id === id);
+  if (c) c.locked = false;
+  const si = KPI_SECTIONS.findIndex(s => s.id === secId);
+  if (si >= 0) rebuildSectionTbodyForAllMembers(si);
+}
 function toggleCustomRubric(name, id){
   const el = document.getElementById('crubric_' + name + '_' + id);
   if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
@@ -2360,7 +2380,7 @@ function updateCustomRubric(secId, id, level, val){
 function addCustomKPI(secId) {
   if (!customKPIs[secId]) customKPIs[secId] = [];
   const id = 'ck_' + Date.now();
-  customKPIs[secId].push({ id, kpi: '', measurement: '', freq: 'Yearly', weight: 0.1, rubric: {5:'',4:'',3:'',2:'',1:''} });
+  customKPIs[secId].push({ id, kpi: '', measurement: '', freq: 'Yearly', weight: 0.1, rubric: {5:'',4:'',3:'',2:'',1:''}, locked: false });
   MEMBERS.forEach(name => {
     if (!scores[name]) scores[name] = {};
     scores[name][id] = null;
