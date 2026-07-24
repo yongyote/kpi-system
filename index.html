@@ -410,6 +410,13 @@
     transition: all 0.15s; margin-top: 4px;
   }
   .kpi-custom-del-btn:hover { color: #d13438; background: #fef2f2; }
+  .kpi-custom-save-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border: none; background: none; color: #107c10;
+    cursor: pointer; font-size: 15px; padding: 0; border-radius: 6px;
+    transition: all 0.15s; margin-top: 4px;
+  }
+  .kpi-custom-save-btn:hover { background: #dff6dd; }
   .add-kpi-row td {
     padding: 8px 12px !important; border-top: 1px dashed #d8c8f0 !important;
   }
@@ -2301,6 +2308,7 @@ function buildCustomKPIRows(name, sec, si) {
           title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
           ${naDisabled?'N/A':'✓'}
         </button>
+        <button class="kpi-custom-save-btn admin-only" onclick="saveAll()" title="บันทึก KPI นี้">💾</button>
         <button class="kpi-custom-del-btn admin-only" onclick="removeCustomKPI('${sec.id}','${citem.id}')" title="ลบ KPI นี้">🗑</button>
       </td>
       <td class="kpi-text">
