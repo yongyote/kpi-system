@@ -2282,66 +2282,104 @@ function buildCustomKPIRows(name, sec, si) {
   const cItems = customKPIs[sec.id] || [];
   return cItems.map((citem, ci) => {
     const s = scores[name]?.[citem.id] ?? null;
-    const radioName = `score_${name}_${citem.id}`;
-    const checkboxes = [1,2,3,4,5].map(v => {
-      const checked = (s === v) ? 'checked' : '';
-      return `<label class="score-label-wrap">
-        <input type="radio" class="score-cb" name="${radioName}" value="${v}" ${checked}
-          onchange="onScoreChange('${name}','${citem.id}',this)">
-        <span class="score-label scb-s${v}">
-          <span class="cb-check">✓</span>
-          <span class="cb-num">${v}</span>
-        </span>
-      </label>`;
-    }).join('');
-    const clearBtn = `<button class="score-clear-btn" onclick="clearScore('${name}','${citem.id}')" title="ล้างคะแนน">✕</button>`;
-    const rubricBtn = `<button class="rubric-btn" title="ดูเกณฑ์การให้คะแนน" onmouseenter="showRubric('${citem.id}',this)" onmouseleave="hideRubric(300)" onclick="showRubric('${citem.id}',this)">ℹ</button>`;
     const naDisabled = isDisabled(name, citem.id);
     const escKpi  = (citem.kpi  || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const escMeas = (citem.measurement || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const escFreq = (citem.freq || 'Yearly').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     const wPct    = Math.round((citem.weight || 0.1) * 100);
     const totalVal = s ? ((citem.weight || 0.1) * s).toFixed(2) : '—';
-    const _ro  = citem.locked ? 'readonly' : '';
-    const _rod = citem.locked ? 'disabled' : '';
-    const lockBtn = citem.locked
-      ? `<button class="kpi-custom-save-btn admin-only" style="color:#8764b8" onclick="unlockCustomKPI('${sec.id}','${citem.id}')" title="ปลดล็อกเพื่อแก้ไข">✏️</button>`
-      : `<button class="kpi-custom-save-btn admin-only" onclick="saveCustomKPI('${sec.id}','${citem.id}')" title="บันทึก & ล็อก KPI นี้">💾</button>`;
+    const checkboxes = [1,2,3,4,5].map(v => {
+      const checked = (s === v) ? 'checked' : '';
+      return `<label class="score-label-wrap">
+        <input type="radio" class="score-cb" name="score_${name}_${citem.id}" value="${v}" ${checked}
+          onchange="onScoreChange('${name}','${citem.id}',this)">
+        <span class="score-label scb-s${v}"><span class="cb-check">✓</span><span class="cb-num">${v}</span></span>
+      </label>`;
+    }).join('');
+    const clearBtn = `<button class="score-clear-btn" onclick="clearScore('${name}','${citem.id}')" title="ล้างคะแนน">✕</button>`;
+    const rubricBtn = `<button class="rubric-btn" title="ดูเกณฑ์การให้คะแนน" onmouseenter="showRubric('${citem.id}',this)" onmouseleave="hideRubric(300)" onclick="showRubric('${citem.id}',this)">ℹ</button>`;
+
+    // ---------- DISPLAY MODE (locked): เนียนเหมือน KPI มาตรฐาน ----------
+    if (citem.locked) {
+      const ev = getEvidence(name, citem.id);
+      const evCount = ev.images.length + (ev.note.trim() ? 1 : 0);
+      const evBtnClass = 'ev-toggle-btn' + (evCount > 0 ? ' has-ev' : '');
+      const evBtnLabel = evCount > 0 ? `📎 หลักฐาน (${evCount})` : '📎 เพิ่มหลักฐาน';
+      return `<tr id="kpirow_${name}_${citem.id}" class="${naDisabled?'kpi-row-disabled':''}">
+        <td class="no-col" style="vertical-align:top">
+          <div style="font-weight:800;color:#8764b8;font-size:12px">${sec.no}.C${ci+1}</div>
+          <button id="nabtn_${name}_${citem.id}" class="na-btn admin-only${naDisabled?' na-on':''}"
+            onclick="toggleDisabled('${name}','${citem.id}')" title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">${naDisabled?'N/A':'✓'}</button>
+          <button class="kpi-custom-save-btn admin-only" style="color:#7F77DD" onclick="unlockCustomKPI('${sec.id}','${citem.id}')" title="ปลดล็อกเพื่อแก้ไข">✏️</button>
+          <button class="kpi-custom-del-btn admin-only" onclick="removeCustomKPI('${sec.id}','${citem.id}')" title="ลบ KPI นี้">🗑</button>
+        </td>
+        <td class="kpi-text">
+          ${escKpi || '(KPI ที่เพิ่มเอง)'}<span style="font-size:11px;color:#534AB7;background:#EEEDFE;border-radius:20px;padding:1px 8px;margin-left:6px">เพิ่มเอง</span>
+          <br>
+          <button id="evbtn_${name}_${citem.id}" class="${evBtnClass}" onclick="toggleEvidence('${name}','${citem.id}')">${evBtnLabel}</button>
+        </td>
+        <td style="font-size:12px;min-width:180px"><div style="color:var(--text-muted)">${escMeas || '—'}</div></td>
+        <td><span class="freq-badge">${escFreq}</span></td>
+        <td class="weight-cell" style="white-space:nowrap"><span id="wval_${name}_${citem.id}" style="color:#8764b8;font-weight:800">${wPct}%</span></td>
+        <td style="text-align:left;min-width:200px"><div class="score-group">${checkboxes}${clearBtn}${rubricBtn}</div></td>
+        <td class="total-cell" id="total_${name}_${citem.id}">${totalVal}</td>
+      </tr>
+      <tr id="evrow_${name}_${citem.id}" class="evidence-row" style="display:none">
+        <td colspan="7">
+          <div class="evidence-panel">
+            <div>
+              <div class="ev-section-label">📝 บันทึก / หมายเหตุ</div>
+              <textarea class="ev-notes-area" placeholder="ระบุรายละเอียดหลักฐาน..."
+                oninput="updateEvidenceNote('${name}','${citem.id}',this.value)">${ev.note || ''}</textarea>
+            </div>
+            <div>
+              <div class="ev-section-label">📷 รูปภาพ / เอกสารหลักฐาน</div>
+              <div class="ev-img-gallery" id="evgallery_${name}_${citem.id}">
+                <label class="ev-add-img-btn" title="เพิ่มรูปภาพ">
+                  <input type="file" accept="image/*" multiple style="display:none" onchange="addEvidenceImages('${name}','${citem.id}',this)">
+                  <span class="add-icon">📷</span><span>เพิ่มรูป</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+    }
+
+    // ---------- EDIT MODE (unlocked): ฟอร์มกรอก ----------
+    const freqSel = ['Yearly','Quarterly','Monthly','Weekly','Daily'].map(f =>
+      `<option value="${f}" ${escFreq===f?'selected':''}>${f}</option>`).join('');
     return `<tr id="kpirow_${name}_${citem.id}" class="kpi-custom-row${naDisabled?' kpi-row-disabled':''}">
       <td class="no-col" style="vertical-align:top;padding-top:12px">
         <div style="font-weight:800;color:#8764b8;font-size:12px">${sec.no}.C${ci+1}</div>
         <button id="nabtn_${name}_${citem.id}" class="na-btn admin-only${naDisabled?' na-on':''}"
-          onclick="toggleDisabled('${name}','${citem.id}')"
-          title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">
-          ${naDisabled?'N/A':'✓'}
-        </button>
-        ${lockBtn}
+          onclick="toggleDisabled('${name}','${citem.id}')" title="${naDisabled?'คลิกเพื่อเปิดใช้งาน':'คลิกเพื่อไม่ใช้ KPI นี้'}">${naDisabled?'N/A':'✓'}</button>
+        <button class="kpi-custom-save-btn admin-only" onclick="saveCustomKPI('${sec.id}','${citem.id}')" title="บันทึก & ล็อก KPI นี้">💾</button>
         <button class="kpi-custom-del-btn admin-only" onclick="removeCustomKPI('${sec.id}','${citem.id}')" title="ลบ KPI นี้">🗑</button>
       </td>
       <td class="kpi-text">
-        <input class="kpi-field-input" value="${escKpi}" placeholder="ระบุ KPI ที่ต้องการวัด..." ${_ro}
+        <input class="kpi-field-input" value="${escKpi}" placeholder="ระบุ KPI ที่ต้องการวัด..."
           oninput="updateCustomKPIField('${sec.id}','${citem.id}','kpi',this.value)">
         <button class="rubric-set-toggle admin-only" onclick="toggleCustomRubric('${name}','${citem.id}')">⚙ ตั้งเกณฑ์คะแนน 1–5</button>
         <div id="crubric_${name}_${citem.id}" class="custom-rubric-editor" style="display:none">
           ${[5,4,3,2,1].map(v => `<div class="cr-row">
             <span class="cr-badge" style="background:${_RUBRIC_SCORE_STYLE[v].bg};color:${_RUBRIC_SCORE_STYLE[v].color}">${v}</span>
-            <input class="kpi-field-input cr-input" value="${((citem.rubric&&citem.rubric[v])||'').replace(/"/g,'&quot;')}" placeholder="เกณฑ์สำหรับคะแนน ${v}..." ${_ro}
+            <input class="kpi-field-input cr-input" value="${((citem.rubric&&citem.rubric[v])||'').replace(/"/g,'&quot;')}" placeholder="เกณฑ์สำหรับคะแนน ${v}..."
               oninput="updateCustomRubric('${sec.id}','${citem.id}',${v},this.value)">
           </div>`).join('')}
         </div>
       </td>
       <td style="font-size:12px;min-width:180px">
-        <input class="kpi-field-input" value="${escMeas}" placeholder="เกณฑ์การวัด เช่น ≥ 90%" ${_ro}
+        <input class="kpi-field-input" value="${escMeas}" placeholder="เกณฑ์การวัด เช่น ≥ 90%"
           oninput="updateCustomKPIField('${sec.id}','${citem.id}','measurement',this.value)">
       </td>
       <td>
-        <input class="kpi-field-input" style="width:88px" value="${escFreq}" placeholder="Frequency" ${_ro}
-          oninput="updateCustomKPIField('${sec.id}','${citem.id}','freq',this.value)">
+        <select class="kpi-field-input" style="width:104px" onchange="updateCustomKPIField('${sec.id}','${citem.id}','freq',this.value)">${freqSel}</select>
       </td>
       <td class="weight-cell" style="white-space:nowrap">
         <input type="number" class="kpi-field-input" id="cwval_${name}_${citem.id}"
           style="width:44px;text-align:center;font-weight:800;color:#8764b8"
-          value="${wPct}" min="1" max="100" step="1" ${_rod}
+          value="${wPct}" min="1" max="100" step="1"
           onchange="updateCustomKPIWeight('${sec.id}','${citem.id}',this.value)">%
       </td>
       <td style="text-align:left;min-width:200px">
