@@ -2120,6 +2120,7 @@ function buildPersonPages() {
         <button class="btn btn-primary" onclick="updatePersonView('${name}')">🔄 คำนวณใหม่</button>
         <button class="btn btn-success btn-save-round" onclick="saveAll()">💾 บันทึก</button>
         <button class="btn btn-secondary admin-only" onclick="showHistoryModal('${name}')">📋 ประวัติ</button>
+        <button class="btn btn-secondary admin-only" onclick="showCompareModal('${name}')">📊 เทียบ Q1/Q4</button>
         <button class="btn btn-export admin-only" onclick="downloadPDF('${name}')">⬇️ PDF</button>
         <button class="btn btn-export admin-only" onclick="downloadExcel('${name}')">⬇️ Excel</button>
         <span class="last-saved">${localStorage.getItem(rkey('saved')) ? 'บันทึกเมื่อ: '+localStorage.getItem(rkey('saved')) : ''}</span>
@@ -3038,6 +3039,57 @@ function showHistoryModal(name) {
 function closeHistoryModal() {
   const m = document.getElementById('historyModal');
   if (m) m.remove();
+}
+
+// ---- Q1 vs Q4 comparison ----
+function _roundScores(r){ try { return JSON.parse(localStorage.getItem('kpi2026_scores_r'+r) || '{}') || {}; } catch(e){ return {}; } }
+function calcSectionWith(sc, member, si){
+  const sec = KPI_SECTIONS[si]; let total=0, maxTotal=0;
+  for (const item of sec.items){ if (isDisabled(member,item.no)) continue; const w=getItemWeight(member,item.no); const v=(sc[member]||{})[item.no]; if (v!=null) total+=w*v; maxTotal+=w*5; }
+  for (const citem of (customKPIs[sec.id]||[])){ if (isDisabled(member,citem.id)) continue; const w=citem.weight||0; const v=(sc[member]||{})[citem.id]; if (v!=null) total+=w*v; maxTotal+=w*5; }
+  return maxTotal>0 ? (total/maxTotal)*100 : 0;
+}
+function calcTotalWith(sc, member){ let sum=0; for (let i=0;i<KPI_SECTIONS.length;i++) sum+=calcSectionWith(sc,member,i); return sum/KPI_SECTIONS.length; }
+function closeCompareModal(){ const m=document.getElementById('compareModal'); if (m) m.remove(); }
+function showCompareModal(name){
+  const ex=document.getElementById('compareModal'); if (ex) ex.remove();
+  const s1=_roundScores(1), s2=_roundScores(2);
+  const t1=calcTotalWith(s1,name), t2=calcTotalWith(s2,name);
+  const g1=getGrade(t1), g2=getGrade(t2), dTot=t2-t1, upT=dTot>=0;
+  const GC={'A+':'#107c10','A':'#0078d4','B+':'#8764b8','B':'#ca5010','C':'#e3008c','D':'#d13438'};
+  const GB={'A+':'#dff6dd','A':'#deecf9','B+':'#f3effc','B':'#fff4ce','C':'#fde7f3','D':'#fde7e9'};
+  const rows=KPI_SECTIONS.map((sec,si)=>{
+    const p1=calcSectionWith(s1,name,si), p2=calcSectionWith(s2,name,si), d=p2-p1, up=d>=0;
+    const dc=up?'#107c10':'#d13438', db=up?'#dff6dd':'#fde7e9';
+    return `<div style="display:grid;grid-template-columns:190px 1fr 70px;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef1f6">
+      <span style="font-size:13px">${sec.no}. ${sec.name}</span>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><div style="flex:1;height:10px;background:#f0f2f7;border-radius:6px;overflow:hidden"><div style="width:${p1.toFixed(1)}%;height:100%;background:#85B7EB"></div></div><span style="font-size:12px;color:#666;width:40px">${p1.toFixed(0)}%</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:10px;background:#f0f2f7;border-radius:6px;overflow:hidden"><div style="width:${p2.toFixed(1)}%;height:100%;background:#7F77DD"></div></div><span style="font-size:12px;color:#666;width:40px">${p2.toFixed(0)}%</span></div>
+      </div>
+      <span style="justify-self:end;font-size:12px;font-weight:800;color:${dc};background:${db};padding:3px 8px;border-radius:20px">${up?'▲ +':'▼ '}${d.toFixed(1)}</span>
+    </div>`;
+  }).join('');
+  const dtc=upT?'#107c10':'#d13438';
+  const modal=document.createElement('div'); modal.id='compareModal';
+  modal.innerHTML=`<div class="history-backdrop" onclick="if(event.target===this)closeCompareModal()">
+    <div class="history-panel">
+      <div class="history-head">
+        <div><h3>📊 เทียบผลประเมิน Q1 vs Q4</h3>
+        <p>${fullName(name)} (${displayName(name)}) · ${deptName(name)} · ปี 2569</p></div>
+        <button class="history-close" onclick="closeCompareModal()">✕</button>
+      </div>
+      <div class="history-body">
+        <div style="display:flex;align-items:center;gap:16px;background:#f7f9fc;border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="flex:1;text-align:center"><div style="font-size:13px;color:#666">ครั้งที่ 1 · Q1</div><div style="font-size:26px;font-weight:900;color:#185FA5">${t1.toFixed(1)}%</div><span style="display:inline-block;margin-top:4px;font-size:12px;font-weight:800;color:${GC[g1]};background:${GB[g1]};padding:2px 12px;border-radius:20px">${g1}</span></div>
+          <div style="text-align:center;color:${dtc}"><div style="font-size:22px;font-weight:700">→</div><div style="font-size:14px;font-weight:800">${upT?'▲ +':'▼ '}${dTot.toFixed(1)}</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:13px;color:#666">ครั้งที่ 2 · Q4</div><div style="font-size:26px;font-weight:900;color:#3C3489">${t2.toFixed(1)}%</div><span style="display:inline-block;margin-top:4px;font-size:12px;font-weight:800;color:${GC[g2]};background:${GB[g2]};padding:2px 12px;border-radius:20px">${g2}</span></div>
+        </div>
+        <div style="font-size:12px;color:#666;margin-bottom:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#85B7EB;margin-right:5px"></span>Q1 &nbsp;&nbsp; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#7F77DD;margin-right:5px"></span>Q4</div>
+        ${rows}
+      </div>
+    </div></div>`;
+  document.body.appendChild(modal);
 }
 
 function toggleHistoryEntry(id) {
