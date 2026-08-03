@@ -684,6 +684,7 @@
   <button class="active" onclick="showPage('dashboard')">🏠 Dashboard</button>
   <button onclick="showPage('compare')">📈 เปรียบเทียบทีม</button>
   <span id="navPersons" style="display:contents"></span>
+  <button id="navSettings" onclick="showPage('settings')" style="margin-left:auto">⚙ ตั้งค่า</button>
 </nav>
 
 <main>
@@ -745,6 +746,7 @@
 
   <!-- PERSON PAGES (generated) -->
   <div id="personPagesContainer"></div>
+  <div id="page-settings" class="page"><div id="settingsContainer"></div></div>
 </main>
 
 <!-- RUBRIC POPOVER -->
@@ -782,7 +784,7 @@ const CLOUD_KEYS = [
   'kpi2026_evidence_r1', 'kpi2026_evidence_r2',
   'kpi2026_history_r1', 'kpi2026_history_r2',
   'kpi2026_saved_r1', 'kpi2026_saved_r2',
-  'kpi2026_disabled', 'kpi2026_weights', 'kpi2026_customKPIs',
+  'kpi2026_disabled', 'kpi2026_weights', 'kpi2026_customKPIs', 'kpi2026_employees',
 ];
 
 let _sb = null;
@@ -877,6 +879,7 @@ function setCloudStatus(state) {
 }
 
 function loadAllLocal() {
+  loadEmployees();
   migrateRoundStorage(); loadRound();
   loadScores(); loadEvidence(); loadDisabled();
   loadCustomWeights(); loadCustomKPIs(); loadSaveHistory();
@@ -1053,6 +1056,7 @@ function applyRoleUI() {
   document.body.classList.remove('member-mode');
   document.querySelectorAll('nav button').forEach(b => b.style.display = '');
   const np = document.getElementById('navPersons'); if (np) np.style.display = 'contents';
+  const nS = document.getElementById('navSettings'); if (nS) nS.style.display = (currentUser.role === 'admin') ? '' : 'none';
   if (currentUser.role === 'manager' && currentUser.dept) {
     lockDept = currentUser.dept;
     deptFilter = lockDept;
@@ -1422,7 +1426,7 @@ const DEPARTMENTS = {
   '3305': { name: "Solution Consulting & Strategy (SCS)", color: '#e3008c' },
   '3306': { name: "Hybrid Multi-Cloud (HMC)", color: '#008272' },
 };
-const MEMBER_LIST = [
+const DEFAULT_MEMBER_LIST = [
   { key:'54093', empId:'54093', thai:"นายปณตช์วงศ์ ล้ออุทัย", eng:"Panotwong Loauthai", engFirst:"Panotwong", nick:"นต", pos:"IT Transformation Support Assistant Division Manager (Project delivery & Customer Engagement Department) IT Transformation Support Assistant Division Manager ((Project delivery & Customer Engagement Department)", dept:'3301' },
   { key:'59186', empId:'59186', thai:"นายอาณาจักร อังศุมาลี", eng:"Arnachak Aungsumalee", engFirst:"Arnachak", nick:"ดิว", pos:"IT Transformation Support Assistant Division Manager (Network Infrastructure Department)", dept:'3302' },
   { key:'62249', empId:'62249', thai:"นายศิครินทร์ รุ่งเจริญ", eng:"Sikarin Rungchareon", engFirst:"Sikarin", nick:"เต๊าะ", pos:"Network Engineer", dept:'3302' },
@@ -1460,8 +1464,26 @@ const MEMBER_LIST = [
   { key:'68354', empId:'68354', thai:"นายกันตินันท์ บุญยิ่งสถิตย์", eng:"Kantinan Boonyingsathit", engFirst:"Kantinan", nick:"ไช้", pos:"System Engineer", dept:'3306' },
   { key:'69380', empId:'69380', thai:"นายเอกสิทธิ์ โพธิ์จันทร์", eng:"Aekkasit Phochan", engFirst:"Aekkasit", nick:"เอก", pos:"Cloud Engineer", dept:'3306' },
 ];
-const MEMBERS = MEMBER_LIST.map(m => m.key);
-const MEMBER_INFO = Object.fromEntries(MEMBER_LIST.map(m => [m.key, m]));
+let MEMBER_LIST = DEFAULT_MEMBER_LIST.map(m => ({ ...m, active: m.active !== false }));
+let MEMBERS = [];
+let MEMBER_INFO = {};
+function rebuildMembers(){
+  MEMBER_INFO = Object.fromEntries(MEMBER_LIST.map(m => [m.key, m]));
+  MEMBERS = MEMBER_LIST.filter(m => m.active !== false).map(m => m.key);
+}
+rebuildMembers();
+let _setDept = 'all', _setShowInactive = false;
+function loadEmployees(){
+  try {
+    const saved = localStorage.getItem('kpi2026_employees');
+    if (saved) { const arr = JSON.parse(saved); if (Array.isArray(arr) && arr.length) MEMBER_LIST = arr.map(m => ({ ...m, active: m.active !== false })); }
+  } catch(e){}
+  rebuildMembers();
+}
+function saveEmployees(){
+  try { localStorage.setItem('kpi2026_employees', JSON.stringify(MEMBER_LIST)); } catch(e){}
+  cloudPush();
+}
 const AVATAR_COLORS = ['#0078d4','#107c10','#8764b8','#ca5010','#e3008c','#008272','#005a9e','#8e562e'];
 function getInfo(k){ return MEMBER_INFO[k] || {}; }
 function displayName(k){ const m=MEMBER_INFO[k]; return m ? (m.nick || m.engFirst || k) : k; }
@@ -3499,6 +3521,131 @@ function hideRubric(delay) {
 // ============================================================
 // NAVIGATION
 // ============================================================
+
+// ============================================================
+// SETTINGS — Employee management (Admin only)
+// ============================================================
+function _refreshEmpViews(){
+  rebuildMembers();
+  saveEmployees();
+  buildPersonPages();
+  buildNav();
+  buildDeptFilter();
+  renderDashboard();
+  renderSettings();
+}
+function renderSettings(){
+  const el = document.getElementById('settingsContainer'); if (!el) return;
+  if (!currentUser || currentUser.role !== 'admin'){ el.innerHTML = '<div class="card">หน้านี้สำหรับผู้ดูแลระบบ (Admin) เท่านั้น</div>'; return; }
+  const depts = Object.keys(DEPARTMENTS);
+  const deptOpts = '<option value="all">ทุกแผนก</option>' + depts.map(c => `<option value="${c}" ${_setDept===c?'selected':''}>${c} · ${DEPARTMENTS[c].name}</option>`).join('');
+  const list = MEMBER_LIST.filter(m => (_setDept==='all' || m.dept===_setDept) && (_setShowInactive || m.active !== false));
+  const rows = list.map(m => {
+    const ini = (m.nick || m.engFirst || '?').slice(0,2);
+    const inactive = m.active === false;
+    const col = DEPARTMENTS[m.dept] ? DEPARTMENTS[m.dept].color : '#888';
+    return `<div style="display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #eef1f6;opacity:${inactive?0.55:1}">
+      <div style="width:40px;height:40px;border-radius:50%;background:${col}22;color:${col};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">${ini}</div>
+      <div>
+        <div style="font-size:14px">${m.thai} <span style="font-size:12px;color:#888">(${m.nick||''})</span>${inactive?' <span style="font-size:11px;color:#a33;background:#fde7e9;border-radius:20px;padding:1px 8px">ปิดใช้งาน</span>':''}</div>
+        <div style="font-size:12px;color:#888">${m.eng||''} · ${m.pos||''} · รหัส ${m.empId} · ${DEPARTMENTS[m.dept]?DEPARTMENTS[m.dept].name:m.dept}</div>
+      </div>
+      <div style="display:flex;gap:4px;justify-self:end">
+        <button class="btn btn-secondary" style="padding:4px 9px" onclick="openEmpEditor('${m.key}')" title="แก้ไข">✏️</button>
+        <button class="btn btn-secondary" style="padding:4px 9px" onclick="toggleEmpActive('${m.key}')" title="${inactive?'เปิดใช้งาน':'ปิดใช้งาน (ซ่อน)'}">${inactive?'↩︎':'🚫'}</button>
+        <button class="btn btn-secondary" style="padding:4px 9px;color:#d13438" onclick="deleteEmpPermanent('${m.key}')" title="ลบถาวร">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="margin-bottom:16px"><h2 style="font-size:20px;font-weight:800">⚙ ตั้งค่า · จัดการพนักงาน</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-top:4px">เพิ่ม / แก้ไข / ปิดใช้งานพนักงานในแต่ละแผนก · ข้อมูลบันทึกบนส่วนกลาง (ทุกคนเห็นตรงกัน)</p></div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <select onchange="_setDept=this.value;renderSettings()" style="min-width:230px;padding:7px 12px;border:1px solid #cdd6e4;border-radius:8px;font-size:13px">${deptOpts}</select>
+        <label style="font-size:13px;color:#666;cursor:pointer"><input type="checkbox" ${_setShowInactive?'checked':''} onchange="_setShowInactive=this.checked;renderSettings()"> แสดงที่ปิดใช้งานด้วย</label>
+        <span style="margin-left:auto;font-size:13px;color:#888">${list.length} คน</span>
+      </div>
+      <div>${rows || '<div style="padding:16px;color:#888">ไม่มีพนักงานตามเงื่อนไข</div>'}</div>
+    </div>
+    <div class="card" style="border:1px solid #cbb7ef">
+      <div class="card-title" style="color:#534AB7">➕ เพิ่มพนักงานใหม่</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+        <div><label style="font-size:12px;color:#666">รหัสพนักงาน *</label><input id="ne_id" class="kpi-field-input" placeholder="เช่น 69390"></div>
+        <div><label style="font-size:12px;color:#666">ชื่อ-สกุล (ไทย) *</label><input id="ne_thai" class="kpi-field-input" placeholder="นายสมชาย ใจดี"></div>
+        <div><label style="font-size:12px;color:#666">ชื่อ-สกุล (อังกฤษ)</label><input id="ne_eng" class="kpi-field-input" placeholder="Somchai Jaidee"></div>
+        <div><label style="font-size:12px;color:#666">ชื่อเล่น</label><input id="ne_nick" class="kpi-field-input" placeholder="ชาย"></div>
+        <div><label style="font-size:12px;color:#666">ตำแหน่ง</label><input id="ne_pos" class="kpi-field-input" placeholder="System Engineer"></div>
+        <div><label style="font-size:12px;color:#666">แผนก</label><select id="ne_dept" class="kpi-field-input" style="width:100%">${depts.map(c=>`<option value="${c}">${c} · ${DEPARTMENTS[c].name}</option>`).join('')}</select></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn btn-success" onclick="addEmployee()">✓ บันทึกพนักงานใหม่</button></div>
+    </div>`;
+}
+function addEmployee(){
+  const g = id => document.getElementById(id);
+  const empId = (g('ne_id').value||'').trim();
+  const thai  = (g('ne_thai').value||'').trim();
+  const eng   = (g('ne_eng').value||'').trim();
+  const nick  = (g('ne_nick').value||'').trim().replace('คุณ','');
+  const pos   = (g('ne_pos').value||'').trim();
+  const dept  = g('ne_dept').value;
+  if (!empId || !thai){ showToast('⚠️ ต้องกรอกรหัสพนักงานและชื่อ (ไทย)'); return; }
+  if (MEMBER_INFO[empId]){ showToast('⚠️ รหัสพนักงานนี้มีอยู่แล้ว'); return; }
+  MEMBER_LIST.push({ key: empId, empId, thai, eng, engFirst: (eng.split(' ')[0] || empId), nick, pos, dept, active: true });
+  if (!scores[empId]) scores[empId] = {};
+  _refreshEmpViews();
+  showToast('เพิ่มพนักงานแล้ว ✓');
+}
+function toggleEmpActive(key){
+  const m = MEMBER_INFO[key]; if (!m) return;
+  m.active = (m.active === false);
+  _refreshEmpViews();
+  showToast(m.active ? 'เปิดใช้งานแล้ว' : 'ปิดใช้งาน (ซ่อน) แล้ว — ข้อมูลยังอยู่');
+}
+function deleteEmpPermanent(key){
+  const m = MEMBER_INFO[key]; if (!m) return;
+  if (!confirm('ลบพนักงาน "'+m.thai+'" ถาวร?\n\nข้อมูลคะแนนที่ประเมินไว้จะหายและกู้คืนไม่ได้\nแนะนำให้ใช้ "ปิดใช้งาน" (🚫) แทน เพื่อเก็บประวัติ')) return;
+  MEMBER_LIST = MEMBER_LIST.filter(x => x.key !== key);
+  _refreshEmpViews();
+  showToast('ลบพนักงานถาวรแล้ว');
+}
+function closeEmpModal(){ const m = document.getElementById('empModal'); if (m) m.remove(); }
+function openEmpEditor(key){
+  const m = MEMBER_INFO[key]; if (!m) return;
+  const ex = document.getElementById('empModal'); if (ex) ex.remove();
+  const esc = v => (v||'').replace(/"/g,'&quot;');
+  const depts = Object.keys(DEPARTMENTS);
+  const modal = document.createElement('div'); modal.id = 'empModal';
+  modal.innerHTML = `<div class="history-backdrop" onclick="if(event.target===this)closeEmpModal()">
+    <div class="history-panel">
+      <div class="history-head"><div><h3>✏️ แก้ไขข้อมูลพนักงาน</h3><p>รหัส ${m.empId}</p></div><button class="history-close" onclick="closeEmpModal()">✕</button></div>
+      <div class="history-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label style="font-size:12px;color:#666">ชื่อ-สกุล (ไทย)</label><input id="ee_thai" class="kpi-field-input" value="${esc(m.thai)}"></div>
+          <div><label style="font-size:12px;color:#666">ชื่อ-สกุล (อังกฤษ)</label><input id="ee_eng" class="kpi-field-input" value="${esc(m.eng)}"></div>
+          <div><label style="font-size:12px;color:#666">ชื่อเล่น</label><input id="ee_nick" class="kpi-field-input" value="${esc(m.nick)}"></div>
+          <div><label style="font-size:12px;color:#666">ตำแหน่ง</label><input id="ee_pos" class="kpi-field-input" value="${esc(m.pos)}"></div>
+          <div style="grid-column:1/3"><label style="font-size:12px;color:#666">แผนก</label><select id="ee_dept" class="kpi-field-input" style="width:100%">${depts.map(c=>`<option value="${c}" ${m.dept===c?'selected':''}>${c} · ${DEPARTMENTS[c].name}</option>`).join('')}</select></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px"><button class="btn btn-success" onclick="saveEmpEdit('${key}')">✓ บันทึก</button><button class="btn btn-secondary" onclick="closeEmpModal()">ยกเลิก</button></div>
+      </div>
+    </div></div>`;
+  document.body.appendChild(modal);
+}
+function saveEmpEdit(key){
+  const m = MEMBER_INFO[key]; if (!m) return;
+  const g = id => document.getElementById(id);
+  m.thai = (g('ee_thai').value||'').trim();
+  m.eng  = (g('ee_eng').value||'').trim();
+  m.engFirst = (m.eng.split(' ')[0] || m.empId);
+  m.nick = (g('ee_nick').value||'').trim().replace('คุณ','');
+  m.pos  = (g('ee_pos').value||'').trim();
+  m.dept = g('ee_dept').value;
+  closeEmpModal();
+  _refreshEmpViews();
+  showToast('บันทึกข้อมูลพนักงานแล้ว ✓');
+}
+
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
@@ -3519,6 +3666,7 @@ function showPage(id) {
 
   if (id === 'dashboard') renderDashboard();
   if (id === 'compare') renderCompare();
+  if (id === 'settings') renderSettings();
 }
 
 // ============================================================
