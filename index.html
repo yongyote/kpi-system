@@ -3819,6 +3819,23 @@ function deleteEmpPermanent(key){
   showToast('ลบพนักงานถาวรแล้ว');
 }
 function closeEmpModal(){ const m = document.getElementById('empModal'); if (m) m.remove(); }
+function _empLoginUsername(m){ return String(m.engFirst || m.empId).toLowerCase(); }
+function empLoginAccount(m){
+  for (const [k,u] of Object.entries(USERS)) if (u.empKey === m.key) return k;
+  const uname = _empLoginUsername(m);
+  if (USERS[uname] && (USERS[uname].role==='manager' || USERS[uname].role==='admin')) return uname;
+  return null;
+}
+function empHasLogin(m){ return !!empLoginAccount(m); }
+function createEmpLogin(m){
+  if (empHasLogin(m)) return null;
+  let uname = _empLoginUsername(m);
+  if (USERS[uname]) uname = uname + m.empId;
+  if (USERS[uname]) return null;
+  USERS[uname] = { password: uname + '2026', role: 'employee', name: (m.eng || m.nick || uname), dept: m.dept, empKey: m.key, active: true };
+  return uname;
+}
+
 function openEmpEditor(key){
   const m = MEMBER_INFO[key]; if (!m) return;
   const ex = document.getElementById('empModal'); if (ex) ex.remove();
@@ -3836,6 +3853,12 @@ function openEmpEditor(key){
           <div><label style="font-size:12px;color:#666">ตำแหน่ง</label><input id="ee_pos" class="kpi-field-input" value="${esc(m.pos)}"></div>
           <div style="grid-column:1/3"><label style="font-size:12px;color:#666">แผนก</label><select id="ee_dept" class="kpi-field-input" style="width:100%">${depts.map(c=>`<option value="${c}" ${m.dept===c?'selected':''}>${c} · ${DEPARTMENTS[c].name}</option>`).join('')}</select></div>
         </div>
+        <div style="margin-top:14px;border-top:1px solid #eef1f6;padding-top:12px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="ee_login" ${empHasLogin(m)?'checked':''}> มีบัญชีล็อกอิน (พนักงานดูของตัวเอง)
+          </label>
+          <div style="font-size:12px;color:#888;margin-top:4px">${empHasLogin(m) ? ('บัญชี: '+empLoginAccount(m)+(USERS[empLoginAccount(m)]&&USERS[empLoginAccount(m)].role==='employee'?(' / รหัส: '+USERS[empLoginAccount(m)].password):' (สิทธิ์อื่น)')) : ('จะสร้าง: '+_empLoginUsername(m)+' / '+_empLoginUsername(m)+'2026')}</div>
+        </div>
         <div style="margin-top:14px;display:flex;gap:8px"><button class="btn btn-success" onclick="saveEmpEdit('${key}')">✓ บันทึก</button><button class="btn btn-secondary" onclick="closeEmpModal()">ยกเลิก</button></div>
       </div>
     </div></div>`;
@@ -3850,6 +3873,13 @@ function saveEmpEdit(key){
   m.nick = (g('ee_nick').value||'').trim().replace('คุณ','');
   m.pos  = (g('ee_pos').value||'').trim();
   m.dept = g('ee_dept').value;
+  const wantLogin = g('ee_login') && g('ee_login').checked;
+  const had = empHasLogin(m);
+  if (wantLogin && !had) { createEmpLogin(m); saveUsers(); }
+  else if (!wantLogin && had) {
+    const acct = empLoginAccount(m);
+    if (acct && USERS[acct] && USERS[acct].role === 'employee') { delete USERS[acct]; saveUsers(); }
+  }
   closeEmpModal();
   _refreshEmpViews();
   showToast('บันทึกข้อมูลพนักงานแล้ว ✓');
