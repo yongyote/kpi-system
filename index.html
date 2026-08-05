@@ -697,6 +697,10 @@
         <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">คลิกที่การ์ดเพื่อดูรายละเอียด KPI แต่ละคน</p>
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="dash-round-seg" style="display:inline-flex;border:1px solid #cdd6e4;border-radius:99px;padding:3px;background:#f4f7fb">
+          <button type="button" id="dashRound1" onclick="setRound(1)" style="border:none;background:transparent;font-size:12px;font-weight:700;padding:6px 14px;border-radius:99px;cursor:pointer;color:#5a6b82">Q1</button>
+          <button type="button" id="dashRound2" onclick="setRound(2)" style="border:none;background:transparent;font-size:12px;font-weight:700;padding:6px 14px;border-radius:99px;cursor:pointer;color:#5a6b82">Q4</button>
+        </div>
         <label style="font-size:13px;color:var(--text-muted);font-weight:600">แผนก:</label>
         <select id="deptFilter" onchange="setDeptFilter(this.value)"
           style="padding:7px 12px;border:1px solid #cdd6e4;border-radius:8px;font-size:13px;font-weight:600;background:#fff;cursor:pointer;min-width:230px"></select>
@@ -704,11 +708,6 @@
       </div>
     </div>
     <div id="dashboardCards"></div>
-
-    <div style="margin-top:24px;" class="card">
-      <div class="card-title">🔽 KPI Performance Funnel</div>
-      <div id="funnelChart" style="padding:8px 0 16px"></div>
-    </div>
 
     <div style="margin-top:24px;" class="card">
       <div class="card-title">📊 ภาพรวมคะแนนเฉลี่ยรายแผนก</div>
@@ -1557,6 +1556,9 @@ function updateRoundUI(){
   if (b1) b1.classList.toggle('active', currentRound === 1);
   if (b2) b2.classList.toggle('active', currentRound === 2);
   document.querySelectorAll('.btn-save-round').forEach(function(el){ el.textContent = '💾 บันทึก ' + ROUND_LABEL[currentRound]; });
+  var _d1=document.getElementById('dashRound1'), _d2=document.getElementById('dashRound2');
+  if(_d1){ _d1.style.background = currentRound===1?'#fff':'transparent'; _d1.style.color = currentRound===1?'#1f2a37':'#5a6b82'; _d1.style.boxShadow = currentRound===1?'0 0 0 1px #cdd6e4':'none'; }
+  if(_d2){ _d2.style.background = currentRound===2?'#fff':'transparent'; _d2.style.color = currentRound===2?'#1f2a37':'#5a6b82'; _d2.style.boxShadow = currentRound===2?'0 0 0 1px #cdd6e4':'none'; }
 }
 function setRound(r){
   r = (r === 2) ? 2 : 1;
@@ -1855,65 +1857,157 @@ function buildDeptFilter(){
   });
   el.innerHTML = html; el.value = deptFilter;
 }
+const HEAT_COLORS = {
+  'A+':{bg:'#042C53',fg:'#E6F1FB'}, 'A':{bg:'#0C447C',fg:'#E6F1FB'},
+  'B+':{bg:'#185FA5',fg:'#E6F1FB'}, 'B':{bg:'#378ADD',fg:'#FFFFFF'},
+  'C':{bg:'#85B7EB',fg:'#042C53'}, 'D':{bg:'#B5D4F4',fg:'#042C53'}
+};
+function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;'); }
+function displayNameFull(p){ const i=p.info; return (i.eng||i.engFirst||'') + (i.nick?' ('+i.nick+')':''); }
+function memberEvaluated(k){
+  const sc = scores[k]; if (!sc) return false;
+  return Object.keys(sc).some(no => sc[no] !== null && sc[no] !== undefined);
+}
+function dashKraChart(p){
+  if (!p.ev) return '<div style="font-size:12px;color:var(--text-muted)">ยังไม่มีคะแนนในรอบนี้</div>';
+  const bars = KPI_SECTIONS.map((sx,si)=>{
+    const v = Math.round(calcSection(p.key, si));
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:700">${v}%</span>
+        <div style="width:100%;max-width:64px;height:110px;background:#eef2f8;border-radius:6px;display:flex;align-items:flex-end;overflow:hidden"><div style="width:100%;height:${v}%;background:${barColor(v)}"></div></div>
+        <span style="font-size:11px;color:var(--text-muted);text-align:center;line-height:1.3">${sx.name}</span></div>`;
+  }).join('');
+  return `<div style="background:#fff;border:1px solid #e6ebf3;border-radius:8px;padding:14px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">คะแนนรายหมวด · ${displayNameFull(p)}</div><div style="display:flex;gap:14px;align-items:flex-end">${bars}</div></div>`;
+}
+function toggleDashDept(code){
+  const det = document.getElementById('dashdet_'+code); const ch = document.getElementById('dashchev_'+code);
+  if (!det) return; const open = det.style.display==='none'; det.style.display = open?'table-row':'none'; if (ch) ch.style.transform = open?'rotate(90deg)':'';
+}
+function toggleDashMember(id){
+  const el = document.getElementById(id); const ch = document.getElementById(id+'_ch');
+  if (!el) return; const open = el.style.display==='none'; el.style.display = open?'block':'none'; if (ch) ch.style.transform = open?'rotate(90deg)':'';
+}
+function attachHeatTooltip(){
+  const wrap = document.getElementById('dashHeatWrap'); const tip = document.getElementById('dashHeatTip'); if(!wrap||!tip) return;
+  tip.style.cssText = 'position:absolute;pointer-events:none;background:#1f2a37;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;opacity:0;transition:opacity .08s;z-index:20;white-space:nowrap';
+  wrap.onmousemove = function(e){
+    const c = e.target.closest('.dash-cell'); if(!c){ tip.style.opacity=0; return; }
+    const v = c.getAttribute('data-v');
+    tip.textContent = c.getAttribute('data-nm') + (v==='-' ? ' · ยังไม่ประเมิน' : ' · '+v+'%');
+    const r = wrap.getBoundingClientRect();
+    tip.style.left = (e.clientX - r.left + 12) + 'px'; tip.style.top = (e.clientY - r.top + 12) + 'px'; tip.style.opacity = 1;
+  };
+  wrap.onmouseleave = function(){ tip.style.opacity=0; };
+}
+
 function renderDashboard() {
   const container = document.getElementById('dashboardCards');
-  container.innerHTML = '';
+  if (!container) return;
+  if (!document.getElementById('dashRedesignCss')){
+    const s=document.createElement('style'); s.id='dashRedesignCss';
+    s.textContent='.dash-cell{border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;height:32px;cursor:default}.dash-dept-row:hover{background:#f7f9fc}.dash-mem-row:hover{background:#eef4fb}';
+    document.head.appendChild(s);
+  }
+  const codes = Object.keys(DEPARTMENTS).filter(code =>
+    (deptFilter === 'all' || code === deptFilter) &&
+    MEMBERS.some(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code));
 
-  Object.keys(DEPARTMENTS).forEach(code => {
-    if (deptFilter !== 'all' && code !== deptFilter) return;
-    const mem = MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code);
-    if (!mem.length) return;
-    const dcolor = DEPARTMENTS[code].color;
-
-    const sec = document.createElement('div');
-    sec.style.marginBottom = '26px';
-    const head = document.createElement('div');
-    head.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-left:2px;flex-wrap:wrap';
-    head.innerHTML = `<span style="width:6px;height:22px;border-radius:3px;background:${dcolor};display:inline-block"></span>
-      <h3 style="font-size:16px;font-weight:800;color:${dcolor}">${DEPARTMENTS[code].name}</h3>
-      <span style="font-size:12px;color:var(--text-muted)">(${code} · ${mem.length} คน)</span>`;
-    sec.appendChild(head);
-
-    const grid = document.createElement('div');
-    grid.className = 'grid-6';
-
-    mem.forEach(name => {
-      const info = MEMBER_INFO[name];
-      const total = calcTotal(name);
-      const grade = getGrade(total);
-      const gClass = gradeClass(grade);
-      const initials = (info.nick || info.engFirst || '?').slice(0,2);
-
-      const card = document.createElement('div');
-      card.className = 'member-card';
-      card.onclick = () => showPage('person_' + name);
-
-      const sectionBars = KPI_SECTIONS.map((secx, si) => {
-        const pct = calcSection(name, si);
-        return `<div class="section-bar">
-          <span class="label">${si+1}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${barColor(pct)}"></div></div>
-          <span class="pct">${pct.toFixed(0)}%</span>
-        </div>`;
-      }).join('');
-
-      card.innerHTML = `
-        <div class="avatar" style="background:${dcolor}">${initials}</div>
-        <h3>${info.nick || info.engFirst}</h3>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:1px">${info.eng}</div>
-        <div style="font-size:10px;color:#9aa;margin-bottom:6px;min-height:12px">${info.pos ? (info.pos.length>40?info.pos.slice(0,39)+'…':info.pos) : ''}</div>
-        <div class="total-score" style="color:${dcolor}">${total.toFixed(1)}%</div>
-        <span class="grade-badge ${gClass}">${grade} · ${gradeLabel(grade)}</span>
-        <div class="section-bars">${sectionBars}</div>
-      `;
-      grid.appendChild(card);
+  const people = [];
+  codes.forEach(code => {
+    MEMBERS.filter(k => MEMBER_INFO[k] && MEMBER_INFO[k].dept === code).forEach(k => {
+      const ev = memberEvaluated(k);
+      const total = calcTotal(k);
+      people.push({ key:k, code, info:MEMBER_INFO[k], total, ev, grade: ev ? getGrade(total) : null });
     });
-
-    sec.appendChild(grid);
-    container.appendChild(sec);
   });
+  const done = people.filter(p => p.ev);
+  const avg = done.length ? Math.round(done.reduce((s,p)=>s+p.total,0)/done.length) : 0;
 
-  renderFunnel();
+  const statCard = (l,v,c) => `<div style="background:var(--surface-1,#f4f7fb);border-radius:10px;padding:14px 16px">
+      <div style="font-size:12px;color:var(--text-muted)">${l}</div>
+      <div style="font-size:24px;font-weight:800;margin-top:4px;${c?'color:'+c:''}">${v}</div></div>`;
+  const statsHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px">
+      ${statCard('คะแนนเฉลี่ยทีม', avg + '%')}
+      ${statCard('พนักงาน', people.length + ' คน')}
+      ${statCard('ประเมินแล้ว', done.length + ' คน')}
+      ${statCard('รอดำเนินการ', (people.length - done.length) + ' คน', '#ca7a10')}
+    </div>`;
+
+  let heatRows = '';
+  codes.forEach(code => {
+    const mem = people.filter(p => p.code === code);
+    const cells = mem.map(p => {
+      if (!p.ev) return `<span class="dash-cell" data-nm="${escAttr(displayNameFull(p))}" data-v="-" style="background:var(--surface-1,#eef2f8);color:var(--text-muted);border:1px dashed #cdd6e4">–</span>`;
+      const c = HEAT_COLORS[p.grade] || HEAT_COLORS['D'];
+      return `<span class="dash-cell" data-nm="${escAttr(displayNameFull(p))}" data-v="${p.total.toFixed(1)}" style="background:${c.bg};color:${c.fg}">${p.grade}</span>`;
+    }).join('');
+    heatRows += `<div style="display:grid;grid-template-columns:150px 1fr;gap:10px 12px;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;color:${DEPARTMENTS[code].color};font-weight:700">${DEPARTMENTS[code].name}</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:5px">${cells}</div></div>`;
+  });
+  const legend = [['A+','#042C53'],['A','#0C447C'],['B+','#185FA5'],['B','#378ADD'],['C','#85B7EB'],['D','#B5D4F4']]
+    .map(g => `<span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:${g[1]}"></span>${g[0]}</span>`).join('')
+    + `<span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#eef2f8;border:1px dashed #cdd6e4"></span>ยังไม่ประเมิน</span>`;
+  const heatHtml = `<div style="margin-bottom:22px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Heat map · ช่องแสดงเกรด · ชี้เมาส์ดูชื่อ + คะแนน (สีเข้ม = ดี → จาง = ต้องพัฒนา)</div>
+      <div id="dashHeatWrap" style="position:relative">
+        <div style="background:#fff;border:1px solid #e6ebf3;border-radius:12px;padding:14px 16px">
+          ${heatRows}
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #eef2f8;font-size:11px;color:var(--text-muted)">${legend}</div>
+        </div>
+        <div id="dashHeatTip"></div>
+      </div></div>`;
+
+  const order = ['A+','A','B+','B','C','D'];
+  const byGrade = {}; order.forEach(g=>byGrade[g]=[]);
+  done.forEach(p => { (byGrade[p.grade]||byGrade['D']).push(p.info.nick || p.info.engFirst); });
+  const gradesHtml = `<div style="margin-bottom:22px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">แยกตามเกรด · มีใครบ้าง</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+        ${order.map(g => `<div style="background:#fff;border:1px solid #e6ebf3;border-radius:12px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="grade-badge ${gradeClass(g)}">${g}</span>
+            <span style="font-size:20px;font-weight:800">${byGrade[g].length}</span></div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px;line-height:1.6">${byGrade[g].join(', ') || '—'}</div>
+        </div>`).join('')}
+      </div></div>`;
+
+  let pvRows = '';
+  codes.forEach(code => {
+    const mem = people.filter(p => p.code === code);
+    const cnt = {'A+':0,'A':0,'B+':0,'B':0,'C':0,'D':0}; let wait=0, sum=0, n=0;
+    mem.forEach(p => { if (p.ev){ cnt[p.grade]=(cnt[p.grade]||0)+1; sum+=p.total; n++; } else wait++; });
+    const av = n ? Math.round(sum/n)+'%' : '—';
+    pvRows += `<tr class="dash-dept-row" onclick="toggleDashDept('${code}')" style="cursor:pointer;border-bottom:1px solid #eef2f8">
+        <td style="padding:9px 12px;text-align:center;width:34px"><span id="dashchev_${code}" style="display:inline-block;transition:transform .12s">▸</span></td>
+        <td style="padding:9px 12px;text-align:left;font-weight:600;color:${DEPARTMENTS[code].color}">${DEPARTMENTS[code].name}</td>
+        ${order.map(g=>`<td style="padding:9px 12px;text-align:center">${cnt[g]}</td>`).join('')}
+        <td style="padding:9px 12px;text-align:center;color:var(--text-muted)">${wait}</td>
+        <td style="padding:9px 12px;text-align:right;font-weight:700">${av}</td></tr>`;
+    let det = '';
+    mem.forEach(p => {
+      const cid = 'dashm_' + code + '_' + p.key;
+      det += `<div class="dash-mem-row" onclick="toggleDashMember('${cid}')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px">
+          <span style="display:flex;align-items:center;gap:8px"><span id="${cid}_ch" style="color:var(--text-muted);display:inline-block;transition:transform .12s">▸</span><span style="font-size:13px">${p.info.eng || p.info.engFirst}${p.info.nick?' ('+p.info.nick+')':''}</span></span>
+          <span style="font-size:12px;color:var(--text-muted)">${p.ev ? (p.total.toFixed(1)+'% · '+p.grade) : 'ยังไม่ประเมิน'}</span></div>
+        <div id="${cid}" style="display:none;padding:8px 10px 14px">${dashKraChart(p)}</div>`;
+    });
+    pvRows += `<tr id="dashdet_${code}" style="display:none"><td></td><td colspan="${order.length+3}" style="padding:6px 12px 12px;background:var(--surface-1,#f7f9fc)">${det}</td></tr>`;
+  });
+  const pivotHtml = `<div style="margin-bottom:8px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Pivot table · กดแผนกเพื่อดูสมาชิก → กดชื่อเพื่อดูกราฟรายหัวข้อ</div>
+      <div style="background:#fff;border:1px solid #e6ebf3;border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:1px solid #e6ebf3;color:var(--text-muted);font-size:11px">
+            <th></th><th style="text-align:left;padding:9px 12px">แผนก</th>
+            ${order.map(g=>`<th style="padding:9px 12px">${g}</th>`).join('')}
+            <th style="padding:9px 12px">รอ</th><th style="padding:9px 12px;text-align:right">เฉลี่ย</th></tr></thead>
+          <tbody>${pvRows}</tbody>
+        </table></div></div>`;
+
+  container.innerHTML = statsHtml + heatHtml + gradesHtml + pivotHtml;
+  attachHeatTooltip();
+  updateRoundUI();
   renderTeamRadar();
 }
 
